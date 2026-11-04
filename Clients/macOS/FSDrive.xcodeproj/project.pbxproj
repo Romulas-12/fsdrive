@@ -1,0 +1,432 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+		BFE17907C3995B7B8AC678B0 /* FSDrive.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FSDrive.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		52C3094EB6822B53B6462F00 /* FSDriveFileProvider.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FSDriveFileProvider.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		C8D29EF715E478FF52D50662 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
+		2949659E09ACE46F182D3761 /* App-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = App-Info.plist; sourceTree = "<group>"; };
+		B097DEADC73CB7FB15519C16 /* FileProvider-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = FileProvider-Info.plist; sourceTree = "<group>"; };
+		684E3048012D50F374FA4E4E /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		D22201A6411D84403CD932D6 /* FileProvider.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FileProvider.entitlements; sourceTree = "<group>"; };
+		26DFC23B19FAC00A158D19F7 /* pin-uuid.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = "pin-uuid.py"; sourceTree = "<group>"; };
+		25FE031ABA8A9A8ACA7F7301 /* build-mac-app.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "build-mac-app.sh"; sourceTree = "<group>"; };
+		2107985836C89F2711C08749 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = C8D29EF715E478FF52D50662 /* AppIcon.icns */; };
+		9A71663A43C1DC455B36B7E2 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = C8D29EF715E478FF52D50662 /* AppIcon.icns */; };
+		8DD5F214F927084E74F93DB5 /* FSDriveFileProvider.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 52C3094EB6822B53B6462F00 /* FSDriveFileProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6248B367F1BC8E76B99CB890 /* FSDriveCore in Frameworks */ = {isa = PBXBuildFile; productRef = 62A890C53E5595B9B3B79093 /* FSDriveCore */; };
+		A446E47AE7981E46A9C6DE47 /* FSDriveClientKit in Frameworks */ = {isa = PBXBuildFile; productRef = B68FAE4DB96293D262809E8E /* FSDriveClientKit */; };
+		D0B6C807A9C6A60925052315 /* FSDriveCore in Frameworks */ = {isa = PBXBuildFile; productRef = CE03B74010BD5CD5DA8670B5 /* FSDriveCore */; };
+		AC9303C48B59F0E695236006 /* FSDriveClientKit in Frameworks */ = {isa = PBXBuildFile; productRef = EFE18290071DEDA02248D301 /* FSDriveClientKit */; };
+		11FE00F0AB15F15EAEEABE7C /* App */ = {isa = PBXFileSystemSynchronizedRootGroup; path = App; sourceTree = "<group>"; };
+		A67BB337C10933582368E553 /* FileProvider */ = {isa = PBXFileSystemSynchronizedRootGroup; path = FileProvider; sourceTree = "<group>"; };
+		DB747A6BECBAB8BDB6A188FD /* Shared */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Shared; sourceTree = "<group>"; };
+		2264A31AFF93F6E9A1CB0275 = {
+			isa = PBXGroup;
+			children = (
+				11FE00F0AB15F15EAEEABE7C /* App */,
+				A67BB337C10933582368E553 /* FileProvider */,
+				DB747A6BECBAB8BDB6A188FD /* Shared */,
+				D578E71777264151B56DD5E2 /* Resources */,
+				DC43B743BDF4473ACA8EC25A /* scripts */,
+				DE1BBC0C7A3877713D09D505 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D578E71777264151B56DD5E2 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				C8D29EF715E478FF52D50662 /* AppIcon.icns */,
+				2949659E09ACE46F182D3761 /* App-Info.plist */,
+				684E3048012D50F374FA4E4E /* App.entitlements */,
+				B097DEADC73CB7FB15519C16 /* FileProvider-Info.plist */,
+				D22201A6411D84403CD932D6 /* FileProvider.entitlements */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		DC43B743BDF4473ACA8EC25A /* scripts */ = {
+			isa = PBXGroup;
+			children = (
+				25FE031ABA8A9A8ACA7F7301 /* build-mac-app.sh */,
+				26DFC23B19FAC00A158D19F7 /* pin-uuid.py */,
+			);
+			path = scripts;
+			sourceTree = "<group>";
+		};
+		DE1BBC0C7A3877713D09D505 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BFE17907C3995B7B8AC678B0 /* FSDrive.app */,
+				52C3094EB6822B53B6462F00 /* FSDriveFileProvider.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DF368B9148815475E5A5C987 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D9EBD7019204EB496079DB03 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6248B367F1BC8E76B99CB890,
+				A446E47AE7981E46A9C6DE47,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4A3A725C477418F4300F8398 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2107985836C89F2711C08749,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4C4588A2AE884144BE0EACB8 /* Pin binary UUID */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Pin binary UUID";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Same LC_UUID for every build: macOS ties local network access to it (see scripts/pin-uuid.py).\nif [ -z \"${FSDRIVE_NO_PIN:-}\" ]; then\n  python3 \"$SRCROOT/scripts/pin-uuid.py\" \"$TARGET_BUILD_DIR/$EXECUTABLE_PATH\" \"$PRODUCT_BUNDLE_IDENTIFIER\"\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+		DF8547B4B2DEBF4031A62187 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FA9EC3C1E9FB85967012E591 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0B6C807A9C6A60925052315,
+				AC9303C48B59F0E695236006,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D689EB8445853E3B0211F9B = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9A71663A43C1DC455B36B7E2,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BC96FDE0AE652E37765CE814 /* Pin binary UUID */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Pin binary UUID";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Same LC_UUID for every build: macOS ties local network access to it (see scripts/pin-uuid.py).\n# \".v2\": the UUID of the plain name was first seen by an Xcode Debug copy, and macOS kept\n# refusing that UUID local network access without asking, even after a restart.\nif [ -z \"${FSDRIVE_NO_PIN:-}\" ]; then\n  python3 \"$SRCROOT/scripts/pin-uuid.py\" \"$TARGET_BUILD_DIR/$EXECUTABLE_PATH\" \"$PRODUCT_BUNDLE_IDENTIFIER.v2\"\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+		86E69C2F6C508E98BCE4B683 = {
+			isa = PBXCopyFilesBuildPhase;
+			name = "Embed Foundation Extensions";
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				8DD5F214F927084E74F93DB5,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		09A755302F4111AF96D247EE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A0D5576578D0ABAD6D9A74EC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EFA962C0B67C921046E45B19;
+			remoteInfo = FSDriveFileProvider;
+		};
+		117EAF8DB8EEACF6C696BF82 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EFA962C0B67C921046E45B19 /* FSDriveFileProvider */;
+			targetProxy = 09A755302F4111AF96D247EE /* PBXContainerItemProxy */;
+		};
+		324AB97F0BF49202548D237F /* FSDrive */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E2C7898F4DC13B5CD9ED51B7;
+			buildPhases = (
+				DF368B9148815475E5A5C987,
+				D9EBD7019204EB496079DB03,
+				4A3A725C477418F4300F8398,
+				86E69C2F6C508E98BCE4B683,
+				4C4588A2AE884144BE0EACB8,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				117EAF8DB8EEACF6C696BF82,
+			);
+			fileSystemSynchronizedGroups = (
+				11FE00F0AB15F15EAEEABE7C /* App */,
+				DB747A6BECBAB8BDB6A188FD /* Shared */,
+			);
+			name = FSDrive;
+			packageProductDependencies = (
+				62A890C53E5595B9B3B79093 /* FSDriveCore */,
+				B68FAE4DB96293D262809E8E /* FSDriveClientKit */,
+			);
+			productName = FSDrive;
+			productReference = BFE17907C3995B7B8AC678B0;
+			productType = "com.apple.product-type.application";
+		};
+		AAFAA7451405CBDB13CBC8BE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_ENTITLEMENTS = Resources/App.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = BBBH2WC2K8;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Resources/App-Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.romulas.fsdrive;
+				PRODUCT_NAME = FSDrive;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		1FD0AFDD18309C4519020E31 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_ENTITLEMENTS = Resources/App.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = BBBH2WC2K8;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Resources/App-Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.romulas.fsdrive;
+				PRODUCT_NAME = FSDrive;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E2C7898F4DC13B5CD9ED51B7 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAFAA7451405CBDB13CBC8BE /* Debug */,
+				1FD0AFDD18309C4519020E31 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		62A890C53E5595B9B3B79093 /* FSDriveCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA42DF0A57AA914E1BBFCE76 /* XCLocalSwiftPackageReference "../../Server" */;
+			productName = FSDriveCore;
+		};
+		B68FAE4DB96293D262809E8E /* FSDriveClientKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA42DF0A57AA914E1BBFCE76 /* XCLocalSwiftPackageReference "../../Server" */;
+			productName = FSDriveClientKit;
+		};
+		EFA962C0B67C921046E45B19 /* FSDriveFileProvider */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2EB0FBB051565E4746BE2773;
+			buildPhases = (
+				DF8547B4B2DEBF4031A62187,
+				FA9EC3C1E9FB85967012E591,
+				4D689EB8445853E3B0211F9B,
+				BC96FDE0AE652E37765CE814,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A67BB337C10933582368E553 /* FileProvider */,
+				DB747A6BECBAB8BDB6A188FD /* Shared */,
+			);
+			name = FSDriveFileProvider;
+			packageProductDependencies = (
+				CE03B74010BD5CD5DA8670B5 /* FSDriveCore */,
+				EFE18290071DEDA02248D301 /* FSDriveClientKit */,
+			);
+			productName = FSDriveFileProvider;
+			productReference = 52C3094EB6822B53B6462F00;
+			productType = "com.apple.product-type.app-extension";
+		};
+		6C6A0A89FE6A68C49EF01693 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Resources/FileProvider.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = BBBH2WC2K8;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Resources/FileProvider-Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks @executable_path/../../../../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.romulas.fsdrive.fileprovider;
+				PRODUCT_NAME = FSDriveFileProvider;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		5AA7B78F9AD09087A5417AD4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Resources/FileProvider.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = BBBH2WC2K8;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Resources/FileProvider-Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks @executable_path/../../../../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.romulas.fsdrive.fileprovider;
+				PRODUCT_NAME = FSDriveFileProvider;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		2EB0FBB051565E4746BE2773 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6C6A0A89FE6A68C49EF01693 /* Debug */,
+				5AA7B78F9AD09087A5417AD4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CE03B74010BD5CD5DA8670B5 /* FSDriveCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA42DF0A57AA914E1BBFCE76 /* XCLocalSwiftPackageReference "../../Server" */;
+			productName = FSDriveCore;
+		};
+		EFE18290071DEDA02248D301 /* FSDriveClientKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA42DF0A57AA914E1BBFCE76 /* XCLocalSwiftPackageReference "../../Server" */;
+			productName = FSDriveClientKit;
+		};
+		6A0B50AA2C49B085CDD72588 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.4.2;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		225581BECBC18F3365D09249 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.4.2;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		26D7EB3690BF76B59C1E8260 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A0B50AA2C49B085CDD72588 /* Debug */,
+				225581BECBC18F3365D09249 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA42DF0A57AA914E1BBFCE76 /* XCLocalSwiftPackageReference "../../Server" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Server;
+		};
+		A0D5576578D0ABAD6D9A74EC /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+			};
+			buildConfigurationList = 26D7EB3690BF76B59C1E8260;
+			developmentRegion = uk;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				uk,
+				Base,
+			);
+			mainGroup = 2264A31AFF93F6E9A1CB0275;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AA42DF0A57AA914E1BBFCE76 /* XCLocalSwiftPackageReference "../../Server" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = DE1BBC0C7A3877713D09D505 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				324AB97F0BF49202548D237F /* FSDrive */,
+				EFA962C0B67C921046E45B19 /* FSDriveFileProvider */,
+			);
+		};
+	};
+	rootObject = A0D5576578D0ABAD6D9A74EC /* Project object */;
+}

@@ -1,0 +1,4 @@
+module CUserAccess {
+    header "CUserAccess.h"
+    export *
+}

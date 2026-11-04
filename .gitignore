@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+.DS_Store
+/tmp-e2e/
+build/
+.build-linux*/

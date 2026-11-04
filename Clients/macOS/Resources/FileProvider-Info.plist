@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key><string>com.romulas.fsdrive.fileprovider</string>
+	<key>CFBundleExecutable</key><string>FSDriveFileProvider</string>
+	<!-- Shown in System Settings (e.g. Local Network) next to the app itself. -->
+	<key>CFBundleName</key><string>FSDrive для Finder</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+	<key>CFBundleDisplayName</key><string>FSDrive</string>
+	<key>CFBundlePackageType</key><string>XPC!</string>
+	<key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSMinimumSystemVersion</key><string>14.0</string>
+	<!-- Finder sidebar icon: the hexagon, as in the menu bar. -->
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict><key>CFBundleSymbolName</key><string>hexagon</string></dict>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key><string>FSDrive з'єднується з вашим сервером FSDrive (наприклад, QNAP) у локальній мережі, щоб синхронізувати файли.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key><string>com.apple.fileprovider-nonui</string>
+		<key>NSExtensionPrincipalClass</key><string>FSDriveFileProvider.FileProviderExtension</string>
+		<key>NSExtensionFileProviderDocumentGroup</key><string>BBBH2WC2K8.com.romulas.fsdrive</string>
+		<key>NSExtensionFileProviderSupportsEnumeration</key><true/>
+		<key>NSExtensionFileProviderActions</key>
+		<array>
+			<dict>
+				<key>NSExtensionFileProviderActionIdentifier</key><string>com.romulas.fsdrive.action.keep</string>
+				<key>NSExtensionFileProviderActionName</key><string>Завжди зберігати на цьому Mac</string>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>SUBQUERY ( fileproviderItems, $fileproviderItem, $fileproviderItem.userInfo.pinned == "0" ).@count &gt; 0</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionIdentifier</key><string>com.romulas.fsdrive.action.unkeep</string>
+				<key>NSExtensionFileProviderActionName</key><string>Не зберігати постійно</string>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>SUBQUERY ( fileproviderItems, $fileproviderItem, $fileproviderItem.userInfo.pinned == "1" ).@count &gt; 0</string>
+			</dict>
+		</array>
+	</dict>
+</dict>
+</plist>

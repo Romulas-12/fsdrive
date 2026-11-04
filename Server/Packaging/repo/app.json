@@ -1,0 +1,11 @@
+{
+  "name": "FSDrive",
+  "developer": "Romulas",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/Romulas-12/fsdrive",
+  "category": "FSDrive",
+  "type": "Backup/ Sync",
+  "summary": "File sync; your files stay plain folders on your NAS.",
+  "description": "FSDrive turns your NAS into your own cloud. The server runs on the NAS, and the Mac client shows your files in Finder like iCloud Drive, downloading them on demand. On the NAS the files stay plain folders in a share or home folder you choose, so they remain reachable over SMB, in File Station and without FSDrive. Users sign in with their NAS accounts; the administrator chooses who may use FSDrive, sets quotas and file size limits, and can disconnect any device. Outside the local network devices connect through port forwarding, an HTTPS reverse proxy or an SSH gateway, encrypted with the server key. Settings open from the main menu.",
+  "keywords": "sync, file sync, Finder, macOS, cloud"
+}
