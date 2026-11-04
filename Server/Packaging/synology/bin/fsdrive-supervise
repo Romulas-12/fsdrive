@@ -1,0 +1,163 @@
+#!/bin/sh
+# Root part of FSDrive on DSM, run by systemd (fsdrive.service, see fsdrive-root.sh).
+#
+# DSM 7 runs third-party packages as their own unprivileged user, but fsdrived has to
+# be root: it writes each user's files as that user and checks their passwords with DSM.
+# So the package only says whether the service should run (the flag file below, set by
+# Package Center's start and stop), and this loop starts and stops fsdrived to match.
+#
+# The whole script is one function, so a package upgrade that replaces this file cannot
+# change it halfway; when the file changes, the loop exits and systemd starts the new one.
+
+main() {
+    PKG=/var/packages/FSDrive
+    TARGET=$PKG/target
+    VAR=$PKG/var
+    FLAG=$VAR/run
+    PIDFILE=$VAR/fsdrived.pid
+    LOG=$VAR/fsdrived.log
+    ROOT=$VAR/data
+    CGI_DIR=$VAR/cgi
+    AVAHI_FILE=/etc/avahi/services/fsdrive.service
+    UNIT=/etc/systemd/system/fsdrive.service
+    SELF=$(readlink -f "$0")
+    SELF_ID=$(ls -i "$SELF" 2>/dev/null; stat -c %Y "$SELF" 2>/dev/null)
+
+    log_msg() { echo "$(date '+%Y-%m-%dT%H:%M:%S') fsdrive-supervise: $*" >> "$LOG"; }
+
+    port() {
+        p=$(cat "$VAR/port" 2>/dev/null | tr -cd 0-9)
+        echo "${p:-8740}"
+    }
+
+    # DSM's web port, for checking passwords with DSM's sign-in API on this machine.
+    dsm_url() {
+        p=$(/bin/get_key_value /etc/synoinfo.conf external_port_dsm_http 2>/dev/null | tr -cd 0-9)
+        echo "http://127.0.0.1:${p:-5000}/webapi/entry.cgi"
+    }
+
+    running() {
+        pid=$(cat "$PIDFILE" 2>/dev/null)
+        [ -n "$pid" ] && [ -d "/proc/$pid" ] && grep -q fsdrived "/proc/$pid/cmdline" 2>/dev/null
+    }
+
+    # The settings page runs as the package user: it gets what it needs to call
+    # fsdrived's admin API (the server token, the key pin and its short code).
+    share_with_page() {
+        install -d -m 0750 -o root -g FSDrive "$CGI_DIR"
+        sed -n 's/.*"token" *: *"\([0-9a-f]*\)".*/\1/p' "$ROOT/.system/config.json" > "$CGI_DIR/token.new"
+        cp "$ROOT/.system/tls/pin" "$CGI_DIR/pin.new" 2>/dev/null
+        cp "$ROOT/.system/tls/code" "$CGI_DIR/code.new" 2>/dev/null
+        for f in token pin code; do
+            [ -f "$CGI_DIR/$f.new" ] || continue
+            chown root:FSDrive "$CGI_DIR/$f.new"; chmod 0640 "$CGI_DIR/$f.new"
+            mv -f "$CGI_DIR/$f.new" "$CGI_DIR/$f"
+        done
+    }
+
+    # Bonjour: lets Macs find this server with "Find server".
+    publish_bonjour() {
+        [ -d /etc/avahi/services ] || return 0
+        VERSION=$(sed -n 's/^version="\([^"-]*\).*/\1/p' "$PKG/INFO")
+        MODEL=$(/bin/get_key_value /etc.defaults/synoinfo.conf upnpmodelname 2>/dev/null)
+        cat > "$AVAHI_FILE.new" <<EOF
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+<name replace-wildcards="yes">%h</name>
+<service>
+<type>_fsdrive._tcp</type>
+<port>$(port)</port>
+<txt-record>version=$VERSION</txt-record>
+<txt-record>model=${MODEL:-Synology}</txt-record>
+</service>
+</service-group>
+EOF
+        chmod 644 "$AVAHI_FILE.new" && mv -f "$AVAHI_FILE.new" "$AVAHI_FILE"
+        killall -HUP avahi-daemon 2>/dev/null
+    }
+    unpublish_bonjour() {
+        [ -f "$AVAHI_FILE" ] || return 0
+        rm -f "$AVAHI_FILE"
+        killall -HUP avahi-daemon 2>/dev/null
+    }
+
+    start_server() {
+        touch "$LOG" && chmod 600 "$LOG"
+        # Keep the log small: one rotation at 10 MB.
+        [ "$(wc -c < "$LOG")" -gt 10485760 ] && mv "$LOG" "$LOG.1"
+        # The log must not hold secrets: init prints the token, so it goes nowhere.
+        if [ ! -f "$ROOT/.system/config.json" ]; then
+            install -d -m 0711 "$ROOT"
+            "$TARGET/bin/fsdrived" init --root "$ROOT" --owner admin > /dev/null 2>> "$LOG" || { log_msg "init failed"; return 1; }
+            log_msg "initialized $ROOT"
+        fi
+        (
+            umask 007
+            ulimit -n 8192 2>/dev/null
+            export FSDRIVE_DSM_URL=$(dsm_url)
+            # Low CPU priority so a large sync never makes the NAS sluggish.
+            exec nice -n 10 "$TARGET/bin/fsdrived" serve --root "$ROOT" --host 0.0.0.0 --port "$(port)" >> "$LOG" 2>&1 < /dev/null
+        ) &
+        echo $! > "$PIDFILE"
+        sleep 1
+        running || { log_msg "fsdrived exited at start, see above"; rm -f "$PIDFILE"; return 1; }
+        # The key is made on the first start; wait for it before handing it over.
+        i=0
+        while [ ! -f "$ROOT/.system/tls/code" ] && [ $i -lt 10 ]; do sleep 1; i=$((i + 1)); done
+        share_with_page
+        publish_bonjour
+        log_msg "fsdrived started (pid $(cat "$PIDFILE"))"
+    }
+
+    stop_server() {
+        pid=$(cat "$PIDFILE" 2>/dev/null)
+        if running; then
+            kill "$pid"
+            i=0
+            while [ -d "/proc/$pid" ] && [ $i -lt 10 ]; do sleep 1; i=$((i + 1)); done
+            kill -9 "$pid" 2>/dev/null
+            log_msg "fsdrived stopped"
+        fi
+        rm -f "$PIDFILE"
+        unpublish_bonjour
+    }
+
+    echo $$ > "$VAR/supervisor.pid" 2>/dev/null
+    gone=0
+    failures=0
+    while :; do
+        if [ ! -f "$PKG/INFO" ]; then
+            # Uninstalled (an upgrade replaces INFO within seconds): clean up after a minute.
+            gone=$((gone + 1))
+            if [ $gone -ge 30 ]; then
+                stop_server
+                systemctl disable fsdrive.service 2>/dev/null
+                rm -f "$UNIT"
+                systemctl daemon-reload 2>/dev/null
+                exit 0
+            fi
+        else
+            gone=0
+            [ "$(ls -i "$SELF" 2>/dev/null; stat -c %Y "$SELF" 2>/dev/null)" = "$SELF_ID" ] || exit 0   # upgraded: systemd runs the new one
+            if [ -f "$FLAG" ]; then
+                if ! running; then
+                    # A server that keeps failing is retried every minute, not every 2 seconds.
+                    if [ $failures -eq 0 ] || [ $((failures % 30)) -eq 0 ]; then
+                        start_server && failures=0 || failures=$((failures + 1))
+                    else
+                        failures=$((failures + 1))
+                    fi
+                fi
+            else
+                failures=0
+                running && stop_server
+                [ -f "$AVAHI_FILE" ] && unpublish_bonjour
+            fi
+        fi
+        sleep 2
+    done
+}
+
+main "$@"
+exit 0

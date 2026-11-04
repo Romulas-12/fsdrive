@@ -1,0 +1,9 @@
+#!/bin/sh
+# Shows the next step in Package Center: DSM 7 runs packages without root, and FSDrive
+# needs a one-time root setup (bin/fsdrive-root.sh). Nothing to do if it is already set up.
+if [ ! -f /etc/systemd/system/fsdrive.service ]; then
+    cat >> "$SYNOPKG_TEMP_LOGFILE" <<'MSG'
+FSDrive needs a one-time setup as root. Open FSDrive from the main menu: the General page shows how.
+MSG
+fi
+exit 0

@@ -1,0 +1,43 @@
+#!/bin/sh
+# Package Center's service script. It runs as the package user, which cannot start
+# fsdrived (that needs root): it sets the flag the root part (bin/fsdrive-supervise)
+# follows, and waits for the server to come up or go down.
+VAR=/var/packages/FSDrive/var
+FLAG=$VAR/run
+PIDFILE=$VAR/fsdrived.pid
+
+server_running() {
+    pid=$(cat "$PIDFILE" 2>/dev/null)
+    [ -n "$pid" ] && [ -d "/proc/$pid" ]
+}
+root_part_running() {
+    pid=$(cat "$VAR/supervisor.pid" 2>/dev/null)
+    [ -n "$pid" ] && [ -d "/proc/$pid" ]
+}
+
+case "$1" in
+  start)
+    touch "$FLAG"
+    # Without the root part the package still "runs": the settings page tells the
+    # administrator how to set it up.
+    if root_part_running; then
+        i=0
+        while ! server_running && [ $i -lt 15 ]; do sleep 1; i=$((i + 1)); done
+    fi
+    exit 0
+    ;;
+  stop)
+    rm -f "$FLAG"
+    if root_part_running; then
+        i=0
+        while server_running && [ $i -lt 20 ]; do sleep 1; i=$((i + 1)); done
+    fi
+    exit 0
+    ;;
+  status)
+    [ -f "$FLAG" ] && exit 0 || exit 3
+    ;;
+  *)
+    exit 1
+    ;;
+esac

@@ -2,16 +2,16 @@ import Foundation
 import Hummingbird
 import FSDriveCore
 
-/// Where personal libraries live, chosen by the admin on the QTS settings page.
+/// Where personal libraries live, chosen by the admin on the NAS settings page.
 struct FSDriveSettings: Codable, Equatable {
     enum StorageMode: String, Codable { case home, folder }
     enum FolderNaming: String, Codable { case name, uid }
 
     /// `home`: <home>/FSDrive for each user. `folder`: <folderPath>/<user name or uid>.
     var storageMode: StorageMode = .home
-    var folderPath: String = "/share/FSDrive"
+    var folderPath: String = NAS.current.defaultFolder
     var folderNaming: FolderNaming = .name
-    /// QNAP users allowed to use FSDrive. Nobody until the admin picks.
+    /// NAS users allowed to use FSDrive. Nobody until the admin picks.
     var allowedUsers: [String] = []
     /// How devices reach the server away from home.
     enum ExternalMode: String, Codable {
@@ -64,7 +64,7 @@ struct FSDriveSettings: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         storageMode = try c.decodeIfPresent(StorageMode.self, forKey: .storageMode) ?? .home
-        folderPath = try c.decodeIfPresent(String.self, forKey: .folderPath) ?? "/share/FSDrive"
+        folderPath = try c.decodeIfPresent(String.self, forKey: .folderPath) ?? NAS.current.defaultFolder
         folderNaming = try c.decodeIfPresent(FolderNaming.self, forKey: .folderNaming) ?? .name
         allowedUsers = try c.decodeIfPresent([String].self, forKey: .allowedUsers) ?? []
         externalEnabled = try c.decodeIfPresent(Bool.self, forKey: .externalEnabled) ?? false
@@ -83,22 +83,23 @@ struct FSDriveSettings: Codable, Equatable {
     }
 }
 
-/// An account from the system user database (QTS keeps users in /etc/passwd).
+/// An account from the system user database (QTS and DSM keep local users in /etc/passwd).
 struct SystemUser: Codable {
     var name: String
     var uid: UInt32
     var gid: UInt32
     var home: String
 
-    /// Login accounts: admin and regular users. System and guest accounts are left out.
+    /// Login accounts: admin and regular users. System, package and guest accounts are left out.
     static func all() -> [SystemUser] {
         let path = ProcessInfo.processInfo.environment["FSDRIVE_PASSWD_FILE"] ?? "/etc/passwd"
         guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return [] }
         return text.split(separator: "\n").compactMap { line in
             let f = line.split(separator: ":", omittingEmptySubsequences: false)
             guard f.count >= 6, let uid = UInt32(f[2]), let gid = UInt32(f[3]) else { return nil }
-            guard uid == 0 || (500..<65534).contains(uid) else { return nil }
-            return SystemUser(name: String(f[0]), uid: uid, gid: gid, home: String(f[5]))
+            let name = String(f[0]), home = String(f[5])
+            guard NAS.current.isLoginAccount(name: name, uid: uid, home: home) else { return nil }
+            return SystemUser(name: name, uid: uid, gid: gid, home: home)
         }
     }
 
@@ -107,7 +108,7 @@ struct SystemUser: Codable {
 
 /// Who a request comes from.
 enum Principal {
-    /// The server token from config.json: QTS settings page and maintenance tools.
+    /// The server token from config.json: the NAS settings page and maintenance tools.
     case admin
     case user(String)
 }
@@ -233,7 +234,7 @@ extension Store {
         switch s.storageMode {
         case .home:
             guard FileIO.lstat(user.home)?.kind == .dir else {
-                throw HTTPError(.conflict, message: "Немає домашньої теки \(user.home): увімкніть домашні теки користувачів у QTS")
+                throw HTTPError(.conflict, message: "Немає домашньої теки \(user.home): увімкніть домашні теки користувачів у \(NAS.current.system)")
             }
             (dir, beside) = (user.home + "/FSDrive", user.home + "/.fsdrive-system")
         case .folder:
@@ -300,7 +301,7 @@ extension Store {
     /// owned by the user. Returns the library, or nil if it already was in place.
     @discardableResult
     func provision(_ name: String, rebind: Bool = false) throws -> Library? {
-        guard let user = SystemUser.named(name) else { throw HTTPError(.notFound, message: "Користувача \(name) немає в QTS") }
+        guard let user = SystemUser.named(name) else { throw HTTPError(.notFound, message: "Користувача \(name) немає в \(NAS.current.system)") }
         let s = try settings()
         if let known = try db.first("SELECT uid FROM account WHERE name = ?", [.text(name)], { UInt32($0.int(0)) }),
            known != user.uid, !rebind, s.storageMode == .home || s.folderNaming == .name {
@@ -325,7 +326,7 @@ extension Store {
         // there cannot get a folder elsewhere created or handed over to them.
         let libDir: Dir, sys: Dir
         do {
-            libDir = try Dir.openLibrary(dir, owner: user.uid, create: true) { $0.setOwner(uid: user.uid, gid: 0, mode: 0o770) }
+            libDir = try Dir.openLibrary(dir, owner: user.uid, create: true) { $0.setOwner(uid: user.uid, gid: NAS.current.adminGid, mode: 0o770) }
             try FileIO.mkdirs((sysDir as NSString).deletingLastPathComponent)
             sys = try Dir.openSystem(sysDir, create: true)
         } catch let e as FileIOError where e.code == ELOOP || e.code == ENOTDIR {
@@ -461,33 +462,3 @@ extension Store {
     }
 }
 
-/// Checks a QTS user name and password with QTS itself (its authLogin.cgi), so FSDrive
-/// never stores passwords and follows QTS account changes.
-enum QTSAuth {
-    /// FSDRIVE_AUTH_CGI lets tests stand in a script with the same interface.
-    static let cgi = ProcessInfo.processInfo.environment["FSDRIVE_AUTH_CGI"] ?? "/home/httpd/cgi-bin/authLogin.cgi"
-
-    enum Result { case ok, wrongPassword, twoStep, unavailable }
-
-    static func verify(user: String, password: String) -> Result {
-        guard FileManager.default.isExecutableFile(atPath: cgi) else { return .unavailable }
-        var allowed = CharacterSet.alphanumerics
-        allowed.insert(charactersIn: "-._~")
-        let pwd = Data(password.utf8).base64EncodedString().addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
-        let name = user.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: cgi)
-        // The query goes in the environment, not argv, so other users cannot see it.
-        process.environment = ["QUERY_STRING": "user=\(name)&pwd=\(pwd)&serviceKey=1", "REQUEST_METHOD": "GET", "REMOTE_ADDR": "127.0.0.1"]
-        let out = Pipe()
-        process.standardOutput = out
-        process.standardError = FileHandle.nullDevice
-        do { try process.run() } catch { return .unavailable }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        let xml = String(decoding: data, as: UTF8.self)
-        if xml.contains("<authPassed><![CDATA[1]]></authPassed>") { return .ok }
-        if xml.contains("need_2sv") || xml.contains("<lost_phone>") { return .twoStep }
-        return .wrongPassword
-    }
-}

@@ -7,9 +7,11 @@ Every system gets its own site and git repository (fsdrive-packages-<system>). L
     release.json        current version, files and SHA-256
     index.html          how to add the repository and install manually
     README.md           the same for the git repository page
+Synology has x86_64.json and armv8.json (Package Center sources, one per processor) in place
+of repo.xml, *.spk and icons/; release.json, index.html and README.md are the same.
 
-usage: scripts/build-repo.py qnap --base-url https://example.com/fsdrive-packages-qnap [--out DIR]
-   run scripts/build-qpkg.sh [--x86] first. scripts/publish-repo.sh publishes to GitHub Pages.
+usage: scripts/build-repo.py qnap|synology --base-url https://example.com/fsdrive-packages-qnap [--out DIR]
+   run scripts/build-qpkg.sh [--x86] or scripts/build-spk.sh [--arm] first. scripts/publish-repo.sh publishes to GitHub Pages.
 """
 import argparse
 import hashlib
@@ -120,6 +122,60 @@ def build_qnap(out, base_url, packages):
             "snapshots": [f"snapshots/{p.name}" for p in sorted((out / "snapshots").glob("*.png"))]}
 
 
+# SPK arch -> what DSM's Package Center calls it, for the page.
+SYNOLOGY_ARCHS = {"x86_64": "Intel / AMD (x86_64)", "armv8": "ARM64 (armv8)"}
+
+
+def build_synology(out, base_url, packages):
+    """Package Center source: DSM 7 asks it with a GET whose query names the NAS (arch, DSM build,
+    language) and expects JSON with the packages for that NAS. A static site cannot answer by arch,
+    so each arch gets a source URL of its own: <arch>.json."""
+    info = (SERVER / "Packaging/synology/INFO").read_text()
+    field = lambda key: re.search(rf'^{key}="(.*)"', info, re.M).group(1)
+    name, spk_version = field("package"), field("version")
+    version = spk_version.split("-")[0]
+    spks = {arch: packages / f"{name}_{version}_{arch}.spk" for arch in SYNOLOGY_ARCHS}
+    spks = {arch: p for arch, p in spks.items() if p.exists()}
+    if not spks:
+        sys.exit(f"synology: no {packages}/{name}_{version}_*.spk — run scripts/build-spk.sh first")
+
+    (out / "icons").mkdir()
+    for size in (72, 256):
+        resize_icon(size, out / f"icons/{name}_{size}.png")
+    (out / "snapshots").mkdir()
+    snapshots = []
+    for src in sorted((ROOT / "docs/screenshots").glob("synology-*.png")):
+        shutil.copy2(src, out / "snapshots" / src.name)
+        snapshots.append(f"{base_url}/snapshots/{src.name}")
+
+    now = datetime.now(timezone.utc)
+    files, sources = [], {}
+    for arch, src in spks.items():
+        shutil.copy2(src, out / src.name)
+        data = src.read_bytes()
+        files.append({"arch": arch, "url": f"{base_url}/{src.name}", "size": len(data), "sha256": sha256(src)})
+        # Fields as Package Center reads them (the same as SynoCommunity's spkrepo serves).
+        package = {
+            "package": name, "version": spk_version, "dname": field("displayname"),
+            "desc": APP["description"], "link": f"{base_url}/{src.name}", "size": len(data),
+            "md5": hashlib.md5(data).hexdigest(),
+            "thumbnail": [f"{base_url}/icons/{name}_72.png", f"{base_url}/icons/{name}_256.png"],
+            "snapshot": snapshots, "qinst": True, "qstart": True, "qupgrade": True, "start": True,
+            "depsers": None, "deppkgs": None, "conflictpkgs": None,
+            "maintainer": field("maintainer"), "maintainer_url": field("maintainer_url"),
+            "distributor": field("distributor"), "distributor_url": APP["homepage"], "support_url": field("support_url"),
+            "changelog": "", "beta": False, "thirdparty": True, "silent_install": False,
+            "silent_uninstall": False, "silent_upgrade": True, "auto_upgrade_from": None,
+            "price": 0, "download_count": 0, "recent_download_count": 0, "category": 0, "subcategory": 0, "type": 0,
+        }
+        (out / f"{arch}.json").write_text(json.dumps({"packages": [package], "keyrings": [],
+                                                      "published": now.isoformat(timespec="seconds")}, indent=2) + "\n")
+        sources[arch] = f"{base_url}/{arch}.json"
+    return {"version": version, "published": now.isoformat(timespec="seconds"),
+            "source": sources.get("x86_64") or next(iter(sources.values())), "sources": sources, "files": files,
+            "snapshots": [f"snapshots/{p.name}" for p in sorted((out / "snapshots").glob("*.png"))]}
+
+
 # To add a NAS system: write build_<system>(out, base_url, packages) that fills out/ from the
 # built packages and returns its release dict, and register it here with its setup steps.
 SYSTEMS = {
@@ -139,7 +195,29 @@ SYSTEMS = {
                   "Bind the installed package to the repository over SSH, then install; settings and files are kept:\n\n"
                   "```\nsetcfg FSDrive store $(printf %s '{source}' | md5sum | cut -c1-32) -f /etc/config/qpkg.conf\n```",
     },
+    "synology": {
+        "title": "Synology (DSM 7)",
+        "build": build_synology,
+        "packages": SERVER / "build/spk",
+        "install": "Package Center → Settings → General → Trust Level: Any publisher. Then Package Center → "
+                   "Settings → Package Sources → Add, name FSDrive, location: the URL for your NAS's processor below "
+                   "(Intel or AMD: x86_64, ARM: armv8). FSDrive appears under Community. After installing, open "
+                   "FSDrive from the main menu and finish the one-time setup it shows.",
+        "install_uk": "Package Center → Settings → General → Trust Level: Any publisher. Потім Package Center → "
+                      "Settings → Package Sources → Add, назва FSDrive, адреса — для процесора вашого NAS (Intel чи "
+                      "AMD: x86_64, ARM: armv8). FSDrive з'явиться в розділі Community. Після встановлення відкрийте "
+                      "FSDrive з головного меню й виконайте одноразове налаштування, яке він покаже.",
+    },
 }
+
+
+def sources(rel):
+    """The URLs to add to the app store: one, or one per processor."""
+    return rel.get("sources") or {"": rel["source"]}
+
+
+def sources_html(rel):
+    return "".join(f"<p>{html.escape(arch)}</p>" * bool(arch) + f"<pre>{html.escape(url)}</pre>" for arch, url in sources(rel).items())
 
 
 def write_index(out, system, rel):
@@ -159,7 +237,7 @@ def write_index(out, system, rel):
 <h1>{html.escape(title)} <small>{html.escape(rel["version"])}</small></h1>
 <p>{html.escape(APP["summary"])}</p>
 <p>{html.escape(system["install"])}</p>
-<pre>{html.escape(rel["source"])}</pre>
+{sources_html(rel)}
 <p>Manual install:</p><ul>{files}</ul>
 <p><a href="release.json">release.json</a> · <a href="{html.escape(APP["homepage"])}">{html.escape(APP["name"])}</a></p>
 </body></html>
@@ -181,10 +259,7 @@ This repository holds only the built package site, served at <{base_url}/>; the 
 
 {system["install"]}
 
-```
-{rel["source"]}
-```
-
+{chr(10).join((f"{arch}:" + chr(10) * 2 if arch else "") + f"```{chr(10)}{url}{chr(10)}```" + chr(10) for arch, url in sources(rel).items())}
 Version {rel["version"]}. To install manually, download the package for your NAS:
 
 | Arch | Package | SHA-256 |

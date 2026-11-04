@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Checks a published QNAP package site: every link in repo.xml answers, and the packages served
-are the ones release.json describes (size and SHA-256).
+"""Checks a published package site: every link in the app store's catalog answers (QNAP repo.xml,
+Synology <arch>.json), and the packages served are the ones release.json describes (size and SHA-256).
 
-usage: scripts/check-repo.py https://romulas-12.github.io/fsdrive-packages-qnap [--wait-for CACHECHK]
-   --wait-for waits (up to 5 minutes) until the site serves the repo.xml with that <cachechk>,
-   as GitHub Pages takes a moment to deploy; scripts/publish-repo.sh passes it.
+usage: scripts/check-repo.py https://romulas-12.github.io/fsdrive-packages-qnap [--wait-for STAMP]
+   --wait-for waits (up to 5 minutes) until the site serves that release (QNAP: repo.xml's <cachechk>,
+   Synology: release.json's "published"), as GitHub Pages takes a moment to deploy;
+   scripts/publish-repo.sh passes it.
 """
 import argparse
 import hashlib
@@ -30,21 +31,34 @@ def main():
 
     deadline = time.time() + 300
     while True:
-        root = ET.fromstring(get(f"{base}/repo.xml?t={time.time():.0f}"))
-        if not args.wait_for or root.findtext("cachechk") == args.wait_for:
+        release = json.loads(get(f"{base}/release.json?t={time.time():.0f}"))
+        synology = "sources" in release
+        if synology:
+            stamp = release["published"]
+        else:
+            root = ET.fromstring(get(f"{base}/repo.xml?t={time.time():.0f}"))
+            stamp = root.findtext("cachechk")
+        if not args.wait_for or stamp == args.wait_for:
             break
         if time.time() > deadline:
-            sys.exit(f"FAIL {base}/repo.xml still has cachechk {root.findtext('cachechk')}, not {args.wait_for}")
+            sys.exit(f"FAIL {base} still serves {stamp}, not {args.wait_for}")
         time.sleep(5)
 
-    item = root.find("item")
-    release = json.loads(get(f"{base}/release.json"))
     failures = []
-    if item.findtext("version") != release["version"]:
-        failures.append(f"repo.xml version {item.findtext('version')} != release.json {release['version']}")
-
-    urls = {p.findtext("location") for p in item.findall("platform")}
-    urls |= {item.findtext("icon80"), item.findtext("icon100")} | {s.text for s in item.findall("snapshot")}
+    urls = set()
+    if synology:
+        for arch, source in release["sources"].items():
+            feed = json.loads(get(f"{source}?arch={arch}&major=7"))
+            for p in feed["packages"]:
+                if p["version"].split("-")[0] != release["version"]:
+                    failures.append(f"{source}: version {p['version']} != release.json {release['version']}")
+                urls |= {p["link"], *p["thumbnail"], *p["snapshot"]}
+    else:
+        item = root.find("item")
+        if item.findtext("version") != release["version"]:
+            failures.append(f"repo.xml version {item.findtext('version')} != release.json {release['version']}")
+        urls = {p.findtext("location") for p in item.findall("platform")}
+        urls |= {item.findtext("icon80"), item.findtext("icon100")} | {s.text for s in item.findall("snapshot")}
     for url in sorted(urls):
         try:
             get(url, "HEAD")

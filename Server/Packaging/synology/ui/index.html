@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FSDrive</title>
+<style>
+  /* Looks like a DSM 7 app window (Control Panel, Synology Drive Admin Console): a light
+     side list with a blue selection, a tab strip over the content, plain white grids,
+     rounded controls, and Reset / Apply at the bottom right. DSM draws the window's
+     own title bar around this page. */
+  :root { --bg: #fff; --side: #f4f6f9; --side-hover: #e9eef4; --side-on: #dcebfc; --text: #414b55; --strong: #283541;
+          --muted: #7a8794; --line: #e3e8ee; --row: #eef1f5; --field: #c4ced8; --accent: #0a7ee8; --accent-dark: #0668c4;
+          --hover: #f2f8fe; --selected: #e1effd; --ok: #1f9e4c; --bad: #e0393e; --warn: #e88a00; --note: #fff7e6; --note-line: #ffd48c; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 13px/1.45 Roboto, "Segoe UI", "Helvetica Neue", Arial, sans-serif; background: var(--bg); color: var(--text);
+         display: grid; grid-template-columns: 216px 1fr; }
+  [hidden] { display: none !important; }
+  aside { background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; overflow: auto; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; }
+  .brand img { width: 36px; height: 36px; }
+  .brand b { display: block; font-size: 15px; font-weight: 500; color: var(--strong); }
+  #state { font-size: 12px; color: var(--muted); }
+  nav.side { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 12px; }
+  nav.side button { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: 4px;
+                    background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+  nav.side button:hover { background: var(--side-hover); }
+  nav.side button[aria-selected="true"] { background: var(--side-on); color: var(--accent-dark); font-weight: 500; }
+  nav.side svg { width: 20px; height: 20px; flex: none; }
+  main { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .tabs { display: flex; gap: 24px; padding: 0 20px; border-bottom: 1px solid var(--line); flex: none; }
+  .tabs span { padding: 12px 0 10px; border-bottom: 2px solid var(--accent); color: var(--accent-dark); font-size: 14px; font-weight: 500; }
+  section[data-tab] { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .pane { flex: 1; min-height: 0; overflow: auto; padding: 18px 20px 24px; }
+  .pane > * { max-width: 780px; }
+  .pane > .wide { max-width: none; }
+  h2 { margin: 18px 0 10px; font-size: 14px; font-weight: 600; color: var(--strong); }
+  h2:first-child { margin-top: 0; }
+  p { margin: 0 0 10px; }
+  .muted { color: var(--muted); }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; background: #f1f4f7; border: 1px solid #e3e8ee; padding: 1px 5px; border-radius: 3px; }
+
+  /* Controls */
+  button { font: inherit; height: 30px; padding: 0 16px; border: 1px solid var(--field); border-radius: 3px; background: #fff; color: var(--text);
+           cursor: pointer; min-width: 72px; }
+  button:hover:not(:disabled) { border-color: #9fb0c1; background: #f7f9fb; }
+  button:disabled { color: #b1bac3; border-color: #dde3e9; background: #fafbfc; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: var(--accent-dark); border-color: var(--accent-dark); }
+  button.primary:disabled { background: #9cc8f2; border-color: #9cc8f2; color: #fff; }
+  button.link { height: auto; min-width: 0; border: 0; padding: 0; background: none; color: var(--accent); }
+  button.link:hover:not(:disabled) { background: none; text-decoration: underline; }
+  button.link.bad { color: var(--bad); }
+  select, input:not([type=checkbox]):not([type=radio]) { font: inherit; height: 30px; padding: 0 9px; border: 1px solid var(--field); border-radius: 3px;
+           background: #fff; color: var(--text); outline: none; }
+  select:focus, input:not([type=checkbox]):not([type=radio]):focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(10,126,232,.15); }
+  input:disabled, select:disabled { background: #f5f7f9; color: #a5afb9; }
+  input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; vertical-align: -3px; }
+
+  /* Settings form: label column and field column, as in DSM's Control Panel. */
+  .form-grid { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 12px 16px; align-items: center; }
+  .form-grid .group { display: contents; }
+  .form-grid .hint { grid-column: 2; margin: -6px 0 2px; color: var(--muted); }
+  .form-grid input:not([type=checkbox]):not([type=radio]), .form-grid select { width: 100%; max-width: 360px; }
+  label.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  label.option { display: block; padding: 6px 0; cursor: pointer; }
+  label.option > span { margin-left: 6px; }
+  label.option small { display: block; margin: 2px 0 0 23px; color: var(--muted); font-size: 13px; }
+  .indent { margin: 4px 0 6px 23px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  .indent label { display: inline-flex; align-items: center; gap: 6px; }
+  .note { margin-top: 14px; color: var(--muted); }
+  .note b { color: var(--text); font-weight: 500; }
+  .notice { padding: 12px 14px; border: 1px solid var(--note-line); border-radius: 4px; background: var(--note); margin-bottom: 18px; }
+  .notice h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #a35f00; }
+  .notice ol { margin: 6px 0 8px; padding-left: 20px; }
+  .notice li { margin: 3px 0; }
+  .cmd { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+  .cmd code { padding: 5px 8px; background: #fff; user-select: all; overflow-wrap: anywhere; }
+  .stopped { margin: 20px; }
+
+  /* Bottom bar of a settings page. */
+  .footer-bar { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--line); background: #fff; }
+  .footer-bar .msg { margin-right: auto; }
+
+  /* Lists: toolbar, grid, item count. */
+  .toolbar { flex: none; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 20px; }
+  .toolbar .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .search { position: relative; }
+  .search svg { position: absolute; left: 10px; top: 8px; width: 14px; height: 14px; pointer-events: none; }
+  .search input { width: 200px; padding-left: 30px !important; border-radius: 15px !important; }
+  .help { position: relative; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #a9b5c1; color: #fff;
+          font-size: 12px; font-weight: 700; cursor: help; outline: none; }
+  .help .tip { display: none; position: absolute; top: 26px; right: -8px; z-index: 5; width: min(340px, 80vw); padding: 10px 12px; border-radius: 4px;
+               background: #fff; color: var(--text); font-weight: 400; font-size: 13px; box-shadow: 0 4px 18px rgba(30,45,60,.22); }
+  .help:hover .tip, .help:focus .tip { display: block; }
+  .table-wrap { flex: 1; min-height: 0; overflow: auto; padding: 0 20px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; }
+  table.grid th { position: sticky; top: 0; z-index: 1; height: 36px; padding: 0 10px; background: #fff; color: #5d6b79; font-weight: 600; font-size: 12px;
+                  border-bottom: 1px solid #d9e0e7; white-space: nowrap; }
+  table.grid td { height: 40px; padding: 4px 10px; border-bottom: 1px solid var(--row); }
+  table.grid tbody tr:hover td { background: var(--hover); }
+  table.grid tbody tr.selected td { background: var(--selected); }
+  table.grid .check { width: 36px; padding: 0 0 0 10px; }
+  table.grid .num { text-align: right; }
+  table.grid .act-col { width: 1%; white-space: nowrap; text-align: right; }
+  #users td { white-space: nowrap; }
+  #users td.path { max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 1000px) { .col-limits { display: none; } }
+  @media (max-width: 840px) { .col-path { display: none; } }
+  @media (max-width: 600px) { .col-used, .col-devices { display: none; } }
+  .status-cell { display: inline-flex; align-items: center; }
+  footer.pager { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 8px 20px; border-top: 1px solid var(--line); color: var(--muted); }
+  button.icon { width: 28px; min-width: 0; height: 28px; padding: 0; display: inline-grid; place-items: center; border-color: transparent; background: none; vertical-align: middle; }
+  button.icon:hover:not(:disabled) { border-color: transparent; background: #e9eef4; }
+  button.icon svg { width: 18px; height: 18px; display: block; }
+
+  /* Dialogs: DSM 7 modal with a title, a close cross and buttons at the bottom right. */
+  dialog { border: 0; border-radius: 6px; padding: 0; width: 560px; max-width: calc(100vw - 32px); background: #fff; color: var(--text);
+           box-shadow: 0 12px 48px rgba(20,35,50,.32); }
+  dialog::backdrop { background: rgba(30,40,50,.35); }
+  dialog header { display: flex; align-items: center; padding: 14px 18px 4px; }
+  dialog h3 { margin: 0; font-size: 16px; font-weight: 500; color: var(--strong); }
+  dialog header button { margin-left: auto; }
+  dialog .body { padding: 10px 18px 4px; }
+  dialog .body table.grid td { height: 38px; }
+  dialog .buttons { display: flex; gap: 10px; align-items: center; justify-content: flex-end; padding: 14px 18px 16px; }
+  .limit { display: grid; grid-template-columns: 22px 1fr 90px 34px; gap: 8px; align-items: center; padding: 7px 0; }
+  .limit input[type=number] { width: 100%; }
+
+  @media (max-width: 700px) {
+    body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    aside { border-right: 0; border-bottom: 1px solid var(--line); }
+    .brand { display: none; }
+    nav.side { flex-direction: row; overflow-x: auto; padding: 6px 8px; }
+    nav.side button { white-space: nowrap; flex: none; }
+    .form-grid { grid-template-columns: 1fr; gap: 6px; }
+    .form-grid .hint { grid-column: 1; margin: 0 0 4px; }
+    .form-grid > .label { margin-top: 8px; font-weight: 500; }
+    .form-grid > .label:empty { display: none; }
+    .pane, .toolbar, .table-wrap { padding-left: 16px; padding-right: 16px; }
+    .search input { width: 150px; }
+  }
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand">
+    <img src="images/fsdrive_72.png" alt="">
+    <div><b>FSDrive</b><span id="state"></span></div>
+  </div>
+  <nav class="side" role="tablist">
+    <button role="tab" data-tab="general"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="2" width="16" height="16" rx="3.5" fill="#5b8def"/><path d="M6 7h8M6 10h8M6 13h5" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg><span data-en="General">Загальні</span></button>
+    <button role="tab" data-tab="users"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6.6" r="3.6" fill="#3aa0f0"/><path d="M2.8 18c0-4 3.2-6.3 7.2-6.3s7.2 2.3 7.2 6.3z" fill="#1c7fd8"/></svg><span data-en="Users">Користувачі</span></button>
+    <button role="tab" data-tab="storage"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M1.5 5a1.5 1.5 0 0 1 1.5-1.5h4.4l1.7 1.8H17A1.5 1.5 0 0 1 18.5 6.8v8.7A1.5 1.5 0 0 1 17 17H3a1.5 1.5 0 0 1-1.5-1.5z" fill="#f5a524"/><path d="M1.5 8h17v7.5A1.5 1.5 0 0 1 17 17H3a1.5 1.5 0 0 1-1.5-1.5z" fill="#ffc444"/></svg><span data-en="Storage">Сховище</span></button>
+    <button role="tab" data-tab="access"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="#17b39b"/><path d="M2 10h16M10 2c2.6 2.6 2.6 13.4 0 16M10 2c-2.6 2.6-2.6 13.4 0 16" fill="none" stroke="#fff" stroke-width="1.2"/></svg><span data-en="Remote access">Віддалений доступ</span></button>
+    <button role="tab" data-tab="guard"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l7 2.7v5.2c0 4.2-3 7.5-7 8.9-4-1.4-7-4.7-7-8.9V4.3z" fill="#f2753a"/><path d="M6.8 10l2.4 2.4 4.1-4.8" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-en="Sign-in blocking">Блокування входу</span></button>
+  </nav>
+</aside>
+<main>
+  <div class="tabs"><span id="tab-title"></span></div>
+
+  <section data-tab="general" role="tabpanel">
+    <div class="pane">
+      <div id="root-setup" class="notice" hidden>
+        <h3 data-en="One more step: set up the root part">Ще один крок: налаштуйте службу FSDrive</h3>
+        <p data-en="DSM runs third-party packages without administrator rights, but FSDrive has to write files as each user. This is set up once,
+          in one of two ways. The page notices it by itself.">DSM запускає сторонні пакети без прав адміністратора, а FSDrive має записувати файли від імені кожного користувача.
+          Це налаштовується один раз, одним із двох способів. Сторінка помітить це сама.</p>
+        <p><b data-en="Option 1, Task Scheduler (recommended: kept after DSM updates)">Спосіб 1, Планувальник завдань (рекомендовано: зберігається після оновлень DSM)</b></p>
+        <ol>
+          <li data-en="<b>Control Panel → Task Scheduler → Create → Triggered Task → User-defined script</b>.">
+            <b>Control Panel → Task Scheduler → Create → Triggered Task → User-defined script</b>.</li>
+          <li data-en="<b>General</b>: Task <code>FSDrive</code>, User <code>root</code>, Event <b>Boot-up</b>.">
+            <b>General</b>: Task <code>FSDrive</code>, User <code>root</code>, Event <b>Boot-up</b>.</li>
+          <li data-en="<b>Task Settings → Run command</b>: the command below. Click <b>OK</b>, select the task and click <b>Run</b>.">
+            <b>Task Settings → Run command</b>: команда нижче. Натисніть <b>OK</b>, виберіть завдання й натисніть <b>Run</b>.</li>
+        </ol>
+        <div class="cmd"><code class="setup-cmd"></code><button class="copy" data-copy="cmd" data-en="Copy">Копіювати</button></div>
+        <p style="margin-top:10px"><b data-en="Option 2, over SSH">Спосіб 2, через SSH</b></p>
+        <div class="cmd"><code class="setup-sudo"></code><button class="copy" data-copy="sudo" data-en="Copy">Копіювати</button></div>
+      </div>
+
+      <h2 data-en="General">Загальні</h2>
+      <p class="muted" data-en="FSDrive syncs files between the NAS and users' computers. Files are kept on the NAS as ordinary
+        folders in home or shared folders, so they stay available over SMB, in File Station and in other DSM services.
+        Users sign in with their DSM accounts; files are downloaded to a device when they are opened.">FSDrive синхронізує файли між NAS і комп'ютерами користувачів. Файли зберігаються на NAS звичайними
+        теками в домашніх або спільних теках, тож лишаються доступними через SMB, у File Station та інших службах DSM.
+        Користувачі входять обліковими записами DSM; файли завантажуються на пристрій, коли їх відкривають.</p>
+      <div class="form-grid" style="margin-top:16px">
+        <span class="label" data-en="FSDrive service">Служба FSDrive</span>
+        <div><label class="check"><input type="checkbox" id="service-on"> <span data-en="Enable">Увімкнути</span></label>
+          <span id="service-state" style="margin-left:14px"></span></div>
+        <label class="label" for="lang" data-en="Language">Мова</label>
+        <select id="lang">
+          <option value="auto" data-en="Same as the browser">Як у браузері</option>
+          <option value="en">English</option>
+          <option value="uk">Українська</option>
+        </select>
+      </div>
+      <h2 data-en="Server information">Відомості про сервер</h2>
+      <div class="form-grid">
+        <span class="label" data-en="Version">Версія</span><span id="info-version">—</span>
+        <span class="label" data-en="Port">Порт</span><span id="info-port">—</span>
+        <span class="label" data-en="Server key code">Код ключа сервера</span><span><code id="info-code">—</code></span>
+        <p class="hint" data-en="The device shows the same code on the first sign-in. If they match, the device is connected to this NAS.">Той самий код пристрій показує під час першого входу. Якщо коди збігаються, пристрій з'єднався саме з цим NAS.</p>
+      </div>
+    </div>
+    <div class="footer-bar"><span id="saved-general" class="msg muted"></span>
+      <button id="reset-general" data-en="Reset">Скинути</button><button id="save-general" class="primary" data-en="Apply">Застосувати</button></div>
+  </section>
+
+  <div id="stopped-note" class="notice stopped" hidden></div>
+
+  <section data-tab="users" role="tabpanel">
+    <div class="toolbar">
+      <button id="enable" disabled data-en="Grant access">Надати доступ</button>
+      <button id="disable" disabled data-en="Revoke access">Забрати доступ</button>
+      <span id="saved" class="muted"></span>
+      <div class="right">
+        <span class="help" tabindex="0" role="img" aria-label="Довідка" data-en-label="Help">?<span class="tip" role="tooltip" data-en="Select users and click «Grant access»: each of them gets a personal folder and can sign in
+          with their DSM user name and password. Files written by FSDrive belong to that user; administrators have full access
+          to them. «Revoke access» signs out all of the user's devices; the files stay on the NAS.">
+          Позначте користувачів і натисніть «Надати доступ»: у кожного з'явиться власна тека, і він зможе входити
+          своїм ім'ям і паролем DSM. Файли, які записує FSDrive, належать цьому користувачу; адміністратори мають до них
+          повний доступ. «Забрати доступ» відключає всі пристрої користувача, а файли лишаються на NAS.</span></span>
+        <select id="user-filter" aria-label="Які користувачі" data-en-label="Which users">
+          <option value="all" data-en="All users">Усі користувачі</option>
+          <option value="on" data-en="With access">З доступом</option>
+          <option value="off" data-en="Without access">Без доступу</option>
+        </select>
+        <span class="search"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="#8796a5" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="#8796a5" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <input type="search" id="user-search" placeholder="Пошук" data-en-placeholder="Search" aria-label="Пошук користувача" data-en-label="Search users"></span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="grid">
+        <thead><tr><th class="check"><input type="checkbox" id="select-all" aria-label="Вибрати всіх" data-en-label="Select all"></th><th data-en="Name">Ім'я</th>
+          <th class="col-path" data-en="Folder">Тека</th><th data-en="Status">Стан</th><th class="num col-used" data-en="Used">Зайнято</th>
+          <th class="num col-devices" data-en="Devices">Пристрої</th><th class="col-limits" data-en="Limits">Ліміти</th><th class="act-col"></th></tr></thead>
+        <tbody id="users"><tr><td colspan="8" class="muted" data-en="Loading…">Завантаження…</td></tr></tbody>
+      </table>
+    </div>
+    <footer class="pager">
+      <span id="users-count"></span>
+      <button class="icon" id="refresh" title="Оновити" data-en-title="Refresh" aria-label="Оновити" data-en-label="Refresh"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3" fill="none" stroke="#5d6b79" stroke-width="1.7" stroke-linecap="round"/><path d="M15.5 2.5v4h-4" fill="none" stroke="#5d6b79" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </footer>
+  </section>
+
+  <section data-tab="storage" role="tabpanel">
+    <div class="pane">
+      <h2 data-en="Where files are stored">Де зберігати файли</h2>
+      <label class="option"><input type="radio" name="mode" value="home"><span data-en="Users' home folders">Домашні теки користувачів</span>
+        <small data-en="Each user with access gets an <code>FSDrive</code> folder in their home folder. If it already exists, FSDrive picks up its contents.
+          The home service must be on: <b>Control Panel → User &amp; Group → Advanced → Enable user home service</b>.">У кожного користувача з доступом з'явиться тека <code>FSDrive</code> у його домашній теці. Якщо вона вже є, FSDrive підхопить її вміст.
+          Потрібна увімкнена служба домашніх тек: <b>Control Panel → User &amp; Group → Advanced → Enable user home service</b>.</small>
+      </label>
+      <label class="option"><input type="radio" name="mode" value="folder"><span data-en="A separate shared folder">Окрема спільна тека</span>
+        <small data-en="A personal folder is created for each user in the selected shared folder.">У вибраній спільній теці для кожного користувача створюється власна тека.</small>
+      </label>
+      <div class="indent" id="folder-options">
+        <label><span data-en="Shared folder:">Спільна тека:</span> <select id="share"></select></label>
+        <label><input type="radio" name="naming" value="name"> <span data-en="Folders by user name">Теки за іменами користувачів</span></label>
+        <label><input type="radio" name="naming" value="uid"> <span data-en="Folders by user UID">Теки за UID користувачів</span></label>
+      </div>
+      <p class="note" data-en="<b>Note:</b> FSDrive binds a folder to the UID of the DSM account. Folders by name
+        (<code>/volume1/&lt;folder&gt;/&lt;name&gt;</code>) are easier to find on the NAS, but if an account is deleted and created again
+        with the same name, the new UID gets no access to the existing folder until an administrator confirms the binding
+        («Bind folder» in <b>Users</b>). Folders by UID (<code>/volume1/&lt;folder&gt;/&lt;UID&gt;</code>) are bound unambiguously and need no confirmation.
+        Create a new shared folder in <b>Control Panel → Shared Folder</b>.">
+        <b>Примітка:</b> FSDrive прив'язує теку до UID облікового запису DSM. Теки за іменами
+        (<code>/volume1/&lt;тека&gt;/&lt;ім'я&gt;</code>) легше знайти на NAS, але якщо обліковий запис видалити й створити знову з тим самим
+        іменем, новий UID не отримає доступу до наявної теки, доки адміністратор не підтвердить прив'язку («Прив'язати теку» в розділі
+        «Користувачі»). Теки за UID (<code>/volume1/&lt;тека&gt;/&lt;UID&gt;</code>) прив'язуються однозначно й підтвердження не потребують.
+        Нову спільну теку можна створити в <b>Control Panel → Shared Folder</b>.</p>
+    </div>
+    <div class="footer-bar"><span id="saved-storage" class="msg muted"></span>
+      <button id="reset-storage" data-en="Reset">Скинути</button><button id="save-storage" class="primary" data-en="Apply">Застосувати</button></div>
+  </section>
+
+  <section data-tab="access" role="tabpanel">
+    <div class="pane">
+      <h2 data-en="Remote access">Віддалений доступ</h2>
+      <p class="muted" data-en="On the local network, devices connect to the NAS directly: the server tells them its address itself.
+        Outside the local network, devices use the method selected below. They switch between the two automatically.">У локальній мережі пристрої з'єднуються з NAS напряму: сервер сам повідомляє їм свою адресу.
+        Поза локальною мережею пристрої використовують вибраний нижче спосіб. Перемикання між ними автоматичне.</p>
+      <div class="form-grid" style="margin-top:16px">
+        <span class="label" data-en="External connection">Зовнішнє з'єднання</span>
+        <div><label class="check"><input type="checkbox" id="externalEnabled"> <span data-en="Enable">Увімкнути</span></label></div>
+        <div id="ext-details" class="group">
+          <label class="label" for="externalMode" data-en="Connection method">Спосіб з'єднання</label>
+          <div><select id="externalMode">
+            <option value="ssh" data-en="SSH gateway">SSH-шлюз</option>
+            <option value="https" data-en="HTTPS proxy">HTTPS-проксі</option>
+            <option value="direct" data-en="Port forwarding on the router">Переадресація порту на роутері</option>
+          </select></div>
+          <p class="hint" id="mode-hint-ssh" data-en="The device opens an SSH tunnel to your gateway (for example, a VPS) with its own key. The device
+            receives the key on the local network. The DSM password is never sent over the internet, and no NAS ports are opened.">Пристрій створює SSH-тунель до вашого шлюзу (наприклад, VPS) за власним ключем. Ключ пристрій
+            отримує в локальній мережі. Пароль DSM через інтернет не передається, порти NAS назовні не відкриваються.</p>
+          <p class="hint" id="mode-hint-https" data-en="A reverse proxy (for example, Nginx Proxy Manager, or DSM's own in <b>Control Panel → Login Portal → Advanced → Reverse Proxy</b>)
+            with an HTTPS certificate forwards requests to the FSDrive port on the NAS. Users sign in with their DSM user name and password.
+            Turn off HTTP/2 and request buffering for this host in the proxy.">Зворотний проксі (наприклад, Nginx Proxy Manager або вбудований у DSM: <b>Control Panel → Login Portal → Advanced → Reverse Proxy</b>)
+            із сертифікатом HTTPS переадресовує запити на порт FSDrive на NAS. Вхід — ім'ям і паролем DSM.
+            У налаштуваннях проксі для цього хоста вимкніть HTTP/2 і буферизацію запитів.</p>
+          <p class="hint" id="mode-hint-direct" data-en="The router forwards an external port to the FSDrive port on the NAS (<span class=&quot;local-port&quot;>8740</span>).
+            The connection is encrypted with the server key, which the device remembers on the first sign-in. So sign in on the local network
+            the first time, or compare the server key code in <b>General</b>. Users sign in with their DSM user name and password.">Роутер переадресовує зовнішній порт на порт FSDrive на NAS (<span class="local-port">8740</span>).
+            З'єднання шифрується ключем сервера, який пристрій запам'ятовує під час першого входу. Тому вперше входьте в локальній мережі
+            або звірте код ключа сервера в розділі «Загальні». Вхід — ім'ям і паролем DSM.</p>
+          <div id="external-fields" class="group">
+            <label class="label" for="gatewayHost" data-en="Gateway address">Адреса шлюзу</label><input id="gatewayHost" placeholder="IP або доменне ім'я, напр. files.example.com" data-en-placeholder="IP or domain name, e.g. files.example.com">
+            <label class="label" for="gatewayPort" data-en="SSH port">Порт SSH</label><input id="gatewayPort" type="number" min="1" max="65535" placeholder="22">
+            <label class="label" for="gatewayUser" data-en="Tunnel user">Користувач тунелю</label><input id="gatewayUser" placeholder="fsdrive">
+            <span class="label"></span><div><button id="show-script" data-en="Download setup script">Завантажити скрипт налаштування</button></div>
+          </div>
+          <div id="https-fields" class="group">
+            <label class="label" for="publicURL" data-en="External address">Зовнішня адреса</label><input id="publicURL" placeholder="https://files.example.com">
+            <label class="label" for="trustedProxies" data-en="Trusted proxy servers">Довірені проксі-сервери</label><input id="trustedProxies" placeholder="IP через кому, напр. 10.0.0.5" data-en-placeholder="Comma-separated IPs, e.g. 10.0.0.5">
+          </div>
+          <div id="direct-fields" class="group">
+            <label class="label" for="directHost" data-en="Router's external address">Зовнішня адреса роутера</label><input id="directHost" placeholder="IP або DDNS, напр. myhome.synology.me" data-en-placeholder="IP or DDNS, e.g. myhome.synology.me">
+            <label class="label" for="directPort" data-en="External port">Зовнішній порт</label><input id="directPort" type="number" min="1" max="65535" placeholder="8740">
+          </div>
+          <span class="label" id="state-label" data-en="Status">Стан</span><p id="gateway-state" style="margin:0"></p>
+        </div>
+      </div>
+      <div id="script-box" class="wide" hidden style="margin-top:18px;max-width:780px">
+        <p class="muted" data-en="The file <code>fsdrive-gateway-setup.sh</code> has been saved. Copy it to the gateway (Debian/Ubuntu with OpenSSH) and
+          run it as root, for example:">Файл <code>fsdrive-gateway-setup.sh</code> збережено. Перенесіть його на шлюз (Debian/Ubuntu з OpenSSH) і
+          виконайте від root, наприклад:</p>
+        <pre style="background:#f4f6f9;border:1px solid var(--line);padding:10px;border-radius:4px;font-size:12px;overflow:auto">scp fsdrive-gateway-setup.sh root@gateway:
+ssh root@gateway 'bash fsdrive-gateway-setup.sh &amp;&amp; rm fsdrive-gateway-setup.sh'</pre>
+        <p class="muted" data-en="The script only adds the tunnel user and a separate sshd block for it, checks the configuration and registers
+          the gateway in FSDrive. The gateway asks FSDrive for device keys each time. The file contains the gateway secret: delete it after running.">Скрипт додає лише користувача тунелю й окремий блок sshd для нього, перевіряє конфігурацію і реєструє
+          шлюз у FSDrive. Ключі пристроїв шлюз щоразу питає в FSDrive. У файлі є секрет шлюзу: після запуску видаліть його.</p>
+      </div>
+    </div>
+    <div class="footer-bar"><span id="saved-access" class="msg muted"></span>
+      <button id="reset-access" data-en="Reset">Скинути</button><button id="save-access" class="primary" data-en="Apply">Застосувати</button></div>
+  </section>
+
+  <section data-tab="guard" role="tabpanel">
+    <div class="pane">
+      <p class="muted" data-en="FSDrive blocks an IP address after 5 failed sign-in attempts, and an account after 10
+        failed attempts within 15 minutes. A block lasts 15 minutes. DSM's own auto block (Control Panel → Security → Protection)
+        works separately and applies to DSM sign-in.">FSDrive блокує IP-адресу після 5 невдалих спроб входу, а обліковий запис — після 10
+        невдалих спроб протягом 15 хвилин. Блокування діє 15 хвилин. Автоблокування DSM (Control Panel → Security → Protection)
+        працює окремо й стосується входу в DSM.</p>
+    </div>
+    <div class="table-wrap" style="flex:3">
+      <table class="grid">
+        <thead><tr><th data-en="IP address / account">IP-адреса / обліковий запис</th><th class="num" data-en="Failed attempts">Невдалих спроб</th>
+          <th data-en="Blocked until">Заблоковано до</th><th class="act-col"></th></tr></thead>
+        <tbody id="blocked"><tr><td colspan="4" class="muted" data-en="Loading…">Завантаження…</td></tr></tbody>
+      </table>
+    </div>
+    <footer class="pager">
+      <span id="blocked-count"></span>
+      <button class="icon" id="refresh-blocked" title="Оновити" data-en-title="Refresh" aria-label="Оновити" data-en-label="Refresh"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3" fill="none" stroke="#5d6b79" stroke-width="1.7" stroke-linecap="round"/><path d="M15.5 2.5v4h-4" fill="none" stroke="#5d6b79" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </footer>
+  </section>
+</main>
+
+<dialog id="devices-dialog">
+  <header><h3 id="devices-title"></h3>
+    <button class="icon" id="devices-x" aria-label="Закрити" data-en-label="Close"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="#5d6b79" stroke-width="1.7" stroke-linecap="round"/></svg></button></header>
+  <div class="body">
+    <table class="grid">
+      <thead><tr><th data-en="Device">Пристрій</th><th data-en="Connected">Підключено</th><th data-en="Last seen">Востаннє на зв'язку</th><th></th></tr></thead>
+      <tbody id="devices-list"></tbody>
+    </table>
+    <p class="muted" style="margin:12px 0 0" data-en="A disconnected device stops syncing and loses remote access; to come back, sign in on it again.">Відключений пристрій більше не синхронізується і втрачає віддалений доступ; щоб повернутися, на ньому треба увійти знову.</p>
+  </div>
+  <div class="buttons">
+    <button id="revoke-all" style="margin-right:auto"></button>
+    <button id="devices-close" class="primary" data-en="Close">Закрити</button>
+  </div>
+</dialog>
+
+<dialog id="limits-dialog">
+  <header><h3 id="limits-title"></h3>
+    <button class="icon" id="limits-x" aria-label="Закрити" data-en-label="Close"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="#5d6b79" stroke-width="1.7" stroke-linecap="round"/></svg></button></header>
+  <div class="body">
+    <label class="limit"><input type="checkbox" id="lim-idle-on"><span data-en="Sign in again if the device has not connected for">Вхід знову, якщо пристрій не з'єднувався</span>
+      <input type="number" id="lim-idle" min="1" max="3650" value="90"><span class="muted" data-en="days">днів</span></label>
+    <label class="limit"><input type="checkbox" id="lim-file-on"><span data-en="Largest file">Найбільший файл</span>
+      <input type="number" id="lim-file" min="1" value="100"><span class="muted" data-en="GB">ГБ</span></label>
+    <label class="limit"><input type="checkbox" id="lim-quota-on"><span data-en="Quota for all files">Квота на всі файли</span>
+      <input type="number" id="lim-quota" min="1" value="100"><span class="muted" data-en="GB">ГБ</span></label>
+    <p class="muted" id="limits-used" style="margin-top:8px"></p>
+    <p class="muted" style="margin-bottom:0" data-en="Regardless of the limits, an upload does not start if less than 2% (at least 2 GB)
+      of free space would be left on the volume after it.">Незалежно від лімітів завантаження не почнеться, якщо після нього на томі лишиться менше 2%
+      (щонайменше 2 ГБ) вільного місця.</p>
+  </div>
+  <div class="buttons">
+    <span id="limits-error" class="bad" style="margin-right:auto"></span>
+    <button id="limits-cancel" data-en="Cancel">Скасувати</button>
+    <button id="limits-save" class="primary" data-en="OK">OK</button>
+  </div>
+</dialog>
+
+<script>
+  // Language: chosen in General and kept in this browser; "auto" follows the browser
+  // (DSM has no Ukrainian), and anything without a translation falls back to English.
+  // Static texts carry their translation next to them: data-en, data-en-placeholder,
+  // data-en-title, data-en-label. Another language is one more set of such attributes.
+  const LANGS = ["uk", "en"];
+  const saved = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+  const stored = saved("fsdrive-lang") || "auto";
+  const lang = LANGS.includes(stored) ? stored : (navigator.language || "").startsWith("uk") ? "uk" : "en";
+  const tr = (uk, en) => lang === "uk" ? uk : en;
+  document.documentElement.lang = lang;
+  if (lang !== "uk") {
+    for (const el of document.querySelectorAll(`[data-${lang}]`)) el.innerHTML = el.dataset[lang];
+    for (const el of document.querySelectorAll(`[data-${lang}-placeholder]`)) el.placeholder = el.dataset[lang + "Placeholder"];
+    for (const el of document.querySelectorAll(`[data-${lang}-title]`)) el.title = el.dataset[lang + "Title"];
+    for (const el of document.querySelectorAll(`[data-${lang}-label]`)) el.setAttribute("aria-label", el.dataset[lang + "Label"]);
+  }
+
+  // DSM checks every call with the session's SynoToken. Inside the DSM window it comes
+  // from DSM's own page; opened on its own, from login.cgi.
+  let synoToken = null;
+  const getToken = () => {
+    if (synoToken) return Promise.resolve(synoToken);
+    try { synoToken = window.top.SYNO.SDS.Session.SynoToken; } catch {}
+    if (synoToken) return Promise.resolve(synoToken);
+    return fetch("/webman/login.cgi", { credentials: "same-origin" }).then(r => r.json()).then(j => (synoToken = j.SynoToken || ""), () => "");
+  };
+
+  // The settings script answers some failures before reaching the server; those are told by status.
+  const failures = {
+    401: () => tr("Увійдіть у DSM", "Sign in to DSM"),
+    403: () => tr("Лише для адміністраторів", "Administrators only"),
+    409: () => tr("Спершу ввімкніть зовнішнє з'єднання і натисніть «Застосувати»", "Enable the external connection and click «Apply» first"),
+    502: () => tr("Служба FSDrive не відповідає", "The FSDrive service does not respond"),
+  };
+  const call = (action, opts = {}) => getToken().then(token => fetch("fsdrive.cgi?action=" + action, {
+      credentials: "same-origin",
+      method: opts.body !== undefined || opts.post ? "POST" : "GET",
+      headers: { "X-Requested-With": "fsdrive", "X-SYNO-TOKEN": token, "Content-Type": "application/json" },
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    })).then(r => r.json().catch(() => ({})).then(b => {
+      if (!r.ok) throw new Error(failures[r.status] ? failures[r.status]() : (b.error && (b.error.message || b.error)) || r.status);
+      return b;
+    }));
+  // Starts or stops the package the same way Package Center does, with this admin's session.
+  const packageControl = (method) => getToken().then(token => fetch("/webapi/entry.cgi", {
+      credentials: "same-origin", method: "POST",
+      headers: { "X-SYNO-TOKEN": token, "Content-Type": "application/x-www-form-urlencoded" },
+      body: `api=SYNO.Core.Package.Control&version=1&method=${method}&id=FSDrive`,
+    })).then(r => r.json()).then(j => { if (!j.success) throw new Error(tr("DSM не виконав запит", "DSM refused the request") + ` (${(j.error && j.error.code) || "?"})`); });
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const ago = (t) => t ? new Date(t * 1000).toLocaleString(tr("uk-UA", "en-GB")) : "—";
+  const GB = tr("ГБ", "GB"), MB = tr("МБ", "MB"), KB = tr("КБ", "KB");
+  const size = (b) => b >= 1 << 30 ? (b / (1 << 30)).toFixed(1) + " " + GB : b >= 1 << 20 ? Math.round(b / (1 << 20)) + " " + MB : Math.round((b || 0) / 1024) + " " + KB;
+  const fail = (id, err) => { $(id).innerHTML = `<span class="bad">${esc(err.message)}</span>`; };
+  const done = (id) => { $(id).innerHTML = `<span class="ok">${tr("Збережено", "Saved")}</span>`; setTimeout(() => { $(id).textContent = ""; }, 4000); };
+  let settings = {};
+  let status = {};
+  let loaded = false;
+
+  // Small icons for the actions at the end of a row.
+  const icons = {
+    devices: '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="9.5" rx="1.2" fill="none" stroke="#1c7fd8" stroke-width="1.5"/><path d="M1.5 16.5h17" stroke="#1c7fd8" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    limits: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15a7 7 0 1 1 14 0" fill="none" stroke="#e88a00" stroke-width="1.8"/><path d="M10 15l3.2-5" stroke="#5d6b79" stroke-width="1.7" stroke-linecap="round"/><circle cx="10" cy="15" r="1.5" fill="#5d6b79"/></svg>',
+    rebind: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 12H5.5a3 3 0 0 1 0-6H9a3 3 0 0 1 3 3M12 8h2.5a3 3 0 0 1 0 6H11a3 3 0 0 1-3-3" fill="none" stroke="#17b39b" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  };
+  const action = (kind, user, label) =>
+    `<button class="icon" data-${kind}="${esc(user)}" title="${label}" aria-label="${label}: ${esc(user)}">${icons[kind]}</button>`;
+  const limitsText = (l) => [
+      l && l.quotaGB != null ? tr(`квота ${l.quotaGB} ГБ`, `quota ${l.quotaGB} GB`) : "",
+      l && l.maxFileSizeGB != null ? tr(`файл до ${l.maxFileSizeGB} ГБ`, `files up to ${l.maxFileSizeGB} GB`) : "",
+      l && l.deviceIdleDays != null ? tr(`вхід через ${l.deviceIdleDays} дн.`, `sign-in after ${l.deviceIdleDays} days`) : "",
+    ].filter(Boolean).join(", ");
+
+  // General: the service switch starts or stops the package as Package Center does; the
+  // language applies to this browser. Both take effect with Apply.
+  function renderGeneral() {
+    const running = !!status.running;
+    let text = running ? tr("Працює", "Running") : status.enabled && !status.rootReady ? tr("Потрібне налаштування", "Setup needed")
+      : status.enabled ? tr("Запускається…", "Starting…") : tr("Зупинено", "Stopped");
+    const color = running ? "ok" : status.enabled && !status.rootReady ? "warn" : status.enabled ? "warn" : "bad";
+    $("state").innerHTML = `<span class="dot" style="background:var(--${color})"></span>${text}`;
+    $("service-on").checked = !!status.enabled;
+    $("service-state").innerHTML = `<span class="${color === "bad" ? "muted" : color}">${text}</span>`;
+    $("info-version").textContent = status.version || "—";
+    $("info-port").textContent = status.port || "—";
+    $("info-code").textContent = status.code || "—";
+    $("lang").value = stored;
+    $("root-setup").hidden = status.rootReady !== false;
+    if (status.setup) {
+      for (const el of document.querySelectorAll(".setup-cmd")) el.textContent = status.setup;
+      for (const el of document.querySelectorAll(".setup-sudo")) el.textContent = "sudo " + status.setup;
+    }
+  }
+  document.querySelectorAll("button.copy").forEach(b => b.onclick = () => {
+    const text = b.dataset.copy === "sudo" ? "sudo " + status.setup : status.setup;
+    const ok = () => { b.textContent = tr("Скопійовано", "Copied"); setTimeout(() => { b.textContent = tr("Копіювати", "Copy"); }, 2000); };
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(ok, () => {
+      const range = document.createRange(); range.selectNodeContents(b.previousElementSibling);
+      getSelection().removeAllRanges(); getSelection().addRange(range); document.execCommand("copy"); ok();
+    });
+  });
+  $("reset-general").onclick = () => { renderGeneral(); $("saved-general").textContent = ""; };
+  $("save-general").onclick = () => {
+    const on = $("service-on").checked;
+    const langChanged = $("lang").value !== stored;
+    try { localStorage.setItem("fsdrive-lang", $("lang").value); } catch {}
+    if (on === !!status.enabled) { if (langChanged) location.reload(); else done("saved-general"); return; }
+    if (!on && !confirm(tr("Зупинити службу FSDrive? Пристрої перестануть синхронізуватися, доки службу не буде ввімкнено знову.",
+                           "Stop the FSDrive service? Devices stop syncing until the service is enabled again."))) return;
+    $("save-general").disabled = true;
+    $("saved-general").textContent = on ? tr("Запускаю…", "Starting…") : tr("Зупиняю…", "Stopping…");
+    packageControl(on ? "start" : "stop")
+      .then(() => call("status"))
+      .then(s => {
+        if (on && s.rootReady && !s.running) throw new Error(tr("Службу не вдалося запустити, див. журнал var/fsdrived.log", "The service did not start; see var/fsdrived.log"));
+        location.reload();
+      })
+      .catch(err => { fail("saved-general", err); $("save-general").disabled = false; });
+  };
+
+  // Users get access with the boxes (or a click on the row) and the toolbar, which saves
+  // at once, as in DSM's User & Group.
+  let users = [];
+  const selected = new Set();
+  const shownUsers = () => {
+    const filter = $("user-filter").value, query = $("user-search").value.trim().toLowerCase();
+    return users.filter(u => (filter === "all" || (filter === "on") === u.allowed) && u.name.toLowerCase().includes(query));
+  };
+  function renderUsers(list) {
+    users = list;
+    if ($("devices-dialog").open) renderDevices();
+    for (const name of selected) if (!users.some(u => u.name === name)) selected.delete(name);
+    const shown = shownUsers();
+    $("users").innerHTML = shown.length ? shown.map(u => {
+      let state = `<span class="muted">${tr("Немає доступу", "No access")}</span>`;
+      if (u.allowed && u.status === "ready") state = `<span class="status-cell ok"><span class="dot" style="background:var(--ok)"></span>${tr("Активний", "Active")}</span>`;
+      else if (u.allowed && u.status) state = `<span class="bad">${esc(u.status)}</span>`;
+      else if (u.allowed) state = `<span class="warn">${tr("Готується…", "Preparing…")}</span>`;
+      const actions = [action("devices", u.name, tr("Пристрої", "Devices")), action("limits", u.name, tr("Ліміти", "Limits"))];
+      if ((u.status || "").startsWith("uid")) actions.push(action("rebind", u.name, tr("Прив'язати теку", "Bind folder")));
+      return `<tr data-name="${esc(u.name)}" class="${selected.has(u.name) ? "selected" : ""}">
+        <td class="check"><input type="checkbox" aria-label="${tr("Вибрати", "Select")} ${esc(u.name)}" ${selected.has(u.name) ? "checked" : ""}></td>
+        <td title="${esc([`uid ${u.uid}`, u.allowed ? u.folder : "", limitsText(u.limits)].filter(Boolean).join("\n"))}">${esc(u.name)}</td>
+        <td class="path col-path muted" title="${u.allowed ? esc(u.folder) : ""}">${u.allowed ? esc(u.folder) : ""}</td>
+        <td>${state}</td>
+        <td class="num col-used">${u.allowed || u.usedBytes ? size(u.usedBytes) : '<span class="muted">—</span>'}</td>
+        <td class="num col-devices">${u.devices}</td>
+        <td class="col-limits">${limitsText(u.limits) || '<span class="muted">—</span>'}</td>
+        <td class="act-col">${actions.join("")}</td></tr>`;
+    }).join("") : `<tr><td colspan="8" class="muted">${tr("Нікого не знайдено", "No users found")}</td></tr>`;
+    const picked = shown.filter(u => selected.has(u.name)).length;
+    $("select-all").checked = picked > 0 && picked === shown.length;
+    $("select-all").indeterminate = picked > 0 && picked < shown.length;
+    const chosen = users.filter(u => selected.has(u.name));
+    $("enable").disabled = !chosen.some(u => !u.allowed);
+    $("disable").disabled = !chosen.some(u => u.allowed);
+    $("users-count").textContent = tr(`${shown.length} з ${users.length}`, `${shown.length} of ${users.length}`) + " " + tr("елементів", "items");
+  }
+
+  function setAllowed(on) {
+    const names = users.filter(u => selected.has(u.name) && u.allowed !== on).map(u => u.name);
+    if (!names.length) return;
+    if (!on && !confirm(tr(`Забрати доступ у ${names.join(", ")}? Їхні пристрої буде відключено, файли лишаться на NAS.`,
+                           `Revoke access for ${names.join(", ")}? Their devices will be signed out; the files stay on the NAS.`))) return;
+    const allowed = new Set(users.filter(u => u.allowed).map(u => u.name));
+    names.forEach(n => on ? allowed.add(n) : allowed.delete(n));
+    settings.allowedUsers = [...allowed];
+    $("enable").disabled = $("disable").disabled = true;
+    $("saved").textContent = tr("Зберігаю…", "Saving…");
+    call("settings", { body: settings })
+      .then(r => { selected.clear(); renderUsers(r.users); done("saved"); })
+      .catch(err => { renderUsers(users); fail("saved", err); });
+  }
+  $("enable").onclick = () => setAllowed(true);
+  $("disable").onclick = () => setAllowed(false);
+  $("user-filter").onchange = () => renderUsers(users);
+  $("user-search").oninput = () => renderUsers(users);
+  $("select-all").onchange = (e) => {
+    shownUsers().forEach(u => e.target.checked ? selected.add(u.name) : selected.delete(u.name));
+    renderUsers(users);
+  };
+  $("refresh").onclick = () => call("users").then(r => renderUsers(r.users)).catch(err => alert(err.message));
+
+  // One user's limits; each line switched on by its box, off means no limit.
+  let limitsUser = null;
+  const limitFields = [["idle", "deviceIdleDays", 90], ["file", "maxFileSizeGB", 100], ["quota", "quotaGB", 100]];
+  function openLimits(name) {
+    limitsUser = name;
+    const u = users.find(x => x.name === name) || {};
+    const limits = u.limits || {};
+    $("limits-title").textContent = tr(`Ліміти для ${name}`, `Limits for ${name}`);
+    for (const [id, key, fallback] of limitFields) {
+      $(`lim-${id}-on`).checked = limits[key] != null;
+      $(`lim-${id}`).value = limits[key] ?? fallback;
+      $(`lim-${id}`).disabled = limits[key] == null;
+    }
+    $("limits-used").textContent = tr(`Зараз файли ${name} займають ${size(u.usedBytes)}.`, `${name}'s files now take ${size(u.usedBytes)}.`);
+    $("limits-error").textContent = "";
+    $("limits-dialog").showModal();
+  }
+  for (const [id] of limitFields) $(`lim-${id}-on`).onchange = (e) => { $(`lim-${id}`).disabled = !e.target.checked; };
+  $("limits-cancel").onclick = $("limits-x").onclick = () => $("limits-dialog").close();
+  $("limits-save").onclick = () => {
+    const body = {};
+    for (const [id, key] of limitFields) {
+      if ($(`lim-${id}-on`).checked) body[key] = parseInt($(`lim-${id}`).value, 10) || 0;
+    }
+    call("limits&user=" + encodeURIComponent(limitsUser), { body })
+      .then(r => { renderUsers(r.users); $("limits-dialog").close(); })
+      .catch(err => { $("limits-error").textContent = err.message; });
+  };
+
+  function renderSettings() {
+    document.querySelectorAll('input[name=mode]').forEach(r => r.checked = r.value === settings.storageMode);
+    document.querySelectorAll('input[name=naming]').forEach(r => r.checked = r.value === settings.folderNaming);
+    $("share").value = settings.folderPath;
+    const off = settings.storageMode !== "folder";
+    $("folder-options").querySelectorAll("input, select").forEach(el => el.disabled = off);
+    $("folder-options").style.opacity = off ? .55 : 1;
+  }
+  let savedSettings = {};
+  document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = () => { settings.storageMode = r.value; renderSettings(); });
+  document.querySelectorAll('input[name=naming]').forEach(r => r.onchange = () => { settings.folderNaming = r.value; });
+  $("share").onchange = () => { settings.folderPath = $("share").value; };
+  $("reset-storage").onclick = () => {
+    Object.assign(settings, { storageMode: savedSettings.storageMode, folderNaming: savedSettings.folderNaming, folderPath: savedSettings.folderPath });
+    renderSettings(); $("saved-storage").textContent = "";
+  };
+
+  $("users").onclick = (e) => {
+    const button = e.target.closest("button");
+    if (!button) {
+      const row = e.target.closest("tr[data-name]");
+      if (!row) return;
+      const name = row.dataset.name;
+      selected.has(name) ? selected.delete(name) : selected.add(name);
+      renderUsers(users);
+      return;
+    }
+    const rebind = button.dataset.rebind;
+    if (button.dataset.devices) openDevices(button.dataset.devices);
+    if (button.dataset.limits) openLimits(button.dataset.limits);
+    if (rebind && confirm(tr(`Віддати користувачу ${rebind} наявну теку з таким іменем?`, `Give ${rebind} the existing folder with this name?`))) {
+      call("rebind&user=" + encodeURIComponent(rebind), { post: true }).then(r => renderUsers(r.users)).catch(err => alert(err.message));
+    }
+  };
+
+  // Devices of one user, each with its own switch-off. A click asks again in place
+  // ("Точно відключити?") instead of a browser confirm box.
+  let devicesUser = null;
+  function openDevices(name) {
+    devicesUser = name;
+    renderDevices();
+    $("devices-dialog").showModal();
+  }
+  function renderDevices() {
+    const u = users.find(x => x.name === devicesUser);
+    const list = u ? u.deviceList || [] : [];
+    $("devices-title").textContent = tr(`Пристрої ${devicesUser}: ${list.length}`, `${devicesUser}'s devices: ${list.length}`);
+    $("devices-list").innerHTML = list.length ? list.map(d => `<tr>
+        <td>${esc(d.name)}</td>
+        <td class="muted">${ago(d.createdAt)}</td>
+        <td class="muted">${ago(d.lastSeen)}</td>
+        <td style="text-align:right"><button class="link" data-device="${d.id}">${tr("Відключити", "Disconnect")}</button></td></tr>`).join("")
+      : `<tr><td colspan="4" class="muted">${tr("Немає підключених пристроїв", "No connected devices")}</td></tr>`;
+    $("revoke-all").hidden = list.length < 2;
+    $("revoke-all").textContent = tr("Відключити всі", "Disconnect all");
+    $("revoke-all").classList.remove("bad");
+    delete $("revoke-all").dataset.armed;
+  }
+  const armed = (button, text) => {
+    if (button.dataset.armed) return true;
+    button.dataset.armed = "1";
+    button.textContent = text;
+    button.classList.add("bad");
+    return false;
+  };
+  const failed = (err) => { $("devices-title").innerHTML = `<span class="bad">${esc(err.message)}</span>`; };
+  $("devices-list").onclick = (e) => {
+    const id = e.target.dataset.device;
+    if (!id || !armed(e.target, tr("Точно відключити?", "Disconnect for sure?"))) return;
+    call("revoke-device&id=" + encodeURIComponent(id), { post: true }).then(r => renderUsers(r.users)).catch(failed);
+  };
+  $("revoke-all").onclick = () => {
+    if (!armed($("revoke-all"), tr("Точно відключити всі?", "Disconnect all for sure?"))) return;
+    call("revoke&user=" + encodeURIComponent(devicesUser), { post: true }).then(r => renderUsers(r.users)).catch(failed);
+  };
+  $("devices-close").onclick = $("devices-x").onclick = () => $("devices-dialog").close();
+
+  function renderAccess() {
+    $("externalEnabled").checked = !!settings.externalEnabled;
+    $("externalMode").value = settings.externalMode || "ssh";
+    $("publicURL").value = settings.publicURL || "";
+    $("trustedProxies").value = (settings.trustedProxies || []).join(", ");
+    $("directHost").value = settings.directHost || "";
+    $("directPort").value = settings.directPort || 8740;
+    showMode();
+    $("gatewayHost").value = settings.gatewayHost || "";
+    $("gatewayPort").value = settings.gatewayPort || 22;
+    $("gatewayUser").value = settings.gatewayUser || "fsdrive";
+    let state = "";
+    const forDevices = tr("Адреса для пристроїв", "Address for devices");
+    if (settings.externalEnabled && settings.externalMode === "https") {
+      state = settings.publicURL ? `${forDevices}: <code>${esc(settings.publicURL)}</code>` : "";
+    } else if (settings.externalEnabled && settings.externalMode === "direct") {
+      const host = settings.directHost || "";
+      state = host ? `${forDevices}: <code>https://${esc(host.includes(":") ? `[${host}]` : host)}:${settings.directPort || 8740}</code>. ` +
+        tr("Пристрої дізнаються цю адресу, щойно з'єднаються з сервером.", "Devices learn this address as soon as they connect to the server.") : "";
+    } else if (settings.externalEnabled && settings.gatewayHostKey) {
+      state = `<span class="ok">${tr("Шлюз зареєстровано", "Gateway registered")}</span> (${esc(settings.gatewayAddress)}, ${tr("ключ", "key")} ${esc(settings.gatewayHostKey.split(" ")[1].slice(0, 16))}…). ` +
+        tr("Пристрої отримують ключі під час входу в локальній мережі або автоматично, щойно до неї під'єднаються.",
+           "Devices get their keys when they sign in on the local network, or automatically as soon as they join it.");
+    } else if (settings.externalEnabled) {
+      state = `<span class="warn">${tr("Шлюз ще не налаштовано: натисніть «Застосувати», потім завантажте скрипт і виконайте його на шлюзі.",
+        "The gateway is not set up yet: click «Apply», then download the script and run it on the gateway.")}</span>`;
+    }
+    $("gateway-state").innerHTML = state;
+    $("gateway-state").hidden = $("state-label").hidden = !state;
+  }
+
+  function mode() { return $("externalMode").value || "ssh"; }
+  function showMode() {
+    const on = $("externalEnabled").checked, m = mode();
+    $("ext-details").hidden = !on;
+    $("external-fields").hidden = m !== "ssh"; $("mode-hint-ssh").hidden = m !== "ssh";
+    $("https-fields").hidden = m !== "https"; $("mode-hint-https").hidden = m !== "https";
+    $("direct-fields").hidden = m !== "direct"; $("mode-hint-direct").hidden = m !== "direct";
+  }
+  $("externalEnabled").onchange = showMode;
+  $("externalMode").onchange = showMode;
+  $("reset-access").onclick = () => { renderAccess(); $("saved-access").textContent = ""; };
+
+  $("show-script").onclick = () => {
+    getToken().then(token => fetch("fsdrive.cgi?action=gateway-script", { credentials: "same-origin", headers: { "X-SYNO-TOKEN": token } }))
+      .then(r => r.ok ? r.text() : r.json().catch(() => ({})).then(b => {
+        throw new Error(failures[r.status] ? failures[r.status]() : b.error || r.status);
+      }))
+      .then(text => {
+        // Saved as a file to carry over to the gateway, rather than pasted into a terminal.
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([text], { type: "text/x-shellscript" }));
+        a.download = "fsdrive-gateway-setup.sh";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        $("script-box").hidden = false;
+      })
+      .catch(err => fail("saved-access", err));
+  };
+
+  function renderBlocked(entries) {
+    $("blocked-count").textContent = `${entries.length} ${tr("елементів", "items")}`;
+    if (!entries.length) {
+      $("blocked").innerHTML = `<tr><td colspan="4" class="muted">${tr("Немає заблокованих IP-адрес і облікових записів", "No blocked IP addresses or accounts")}</td></tr>`;
+      return;
+    }
+    $("blocked").innerHTML = entries.map(e => `<tr>
+      <td>${e.kind === "ip" ? tr("IP-адреса", "IP address") : tr("Обліковий запис", "Account")} <b>${esc(e.value)}</b></td>
+      <td class="num">${e.failures}</td>
+      <td>${e.blockedUntil ? `<span class="bad">${ago(e.blockedUntil)}</span>` : '<span class="muted">—</span>'}</td>
+      <td class="act-col"><button class="link" data-kind="${esc(e.kind)}" data-value="${esc(e.value)}">${tr("Розблокувати", "Unblock")}</button></td></tr>`).join("");
+  }
+  const loadBlocked = () => call("blocked").then(r => renderBlocked(r.entries)).catch(err => {
+    $("blocked").innerHTML = `<tr><td colspan="4" class="bad">${esc(err.message)}</td></tr>`;
+  });
+  $("refresh-blocked").onclick = loadBlocked;
+
+  $("blocked").onclick = (e) => {
+    const { kind, value } = e.target.dataset;
+    if (!kind) return;
+    call(`unblock&kind=${encodeURIComponent(kind)}&value=${encodeURIComponent(value)}`, { post: true })
+      .then(r => renderBlocked(r.entries)).catch(err => alert(err.message));
+  };
+
+  $("save-access").onclick = () => {
+    settings.externalEnabled = $("externalEnabled").checked;
+    settings.externalMode = mode();
+    settings.publicURL = $("publicURL").value.trim();
+    settings.trustedProxies = $("trustedProxies").value.split(/[\s,]+/).filter(Boolean);
+    settings.directHost = $("directHost").value.trim();
+    settings.directPort = parseInt($("directPort").value, 10) || 8740;
+    settings.gatewayHost = $("gatewayHost").value.trim();
+    settings.gatewayPort = parseInt($("gatewayPort").value, 10) || 22;
+    settings.gatewayUser = $("gatewayUser").value.trim() || "fsdrive";
+    $("saved-access").textContent = tr("Зберігаю…", "Saving…");
+    call("settings", { body: settings })
+      .then(() => call("settings"))
+      .then(s => { settings = s; savedSettings = { ...s }; renderAccess(); done("saved-access"); })
+      .catch(err => fail("saved-access", err));
+  };
+
+  $("save-storage").onclick = () => {
+    $("saved-storage").textContent = tr("Зберігаю…", "Saving…");
+    call("settings", { body: settings })
+      .then(r => { savedSettings = { ...settings }; renderUsers(r.users); done("saved-storage"); })
+      .catch(err => fail("saved-storage", err));
+  };
+
+  // Side list: one page at a time; the open one is kept in the address (#general, #users…).
+  // Until the service runs, only General can do anything; the others say why.
+  function showTab(name) {
+    const tabs = [...document.querySelectorAll("nav.side button")];
+    if (!tabs.some(t => t.dataset.tab === name)) name = "general";
+    const current = tabs.find(t => t.dataset.tab === name);
+    const blocked = status.running === false && name !== "general";
+    tabs.forEach(t => t.setAttribute("aria-selected", t === current));
+    $("tab-title").textContent = current.textContent.trim();
+    document.querySelectorAll("section[data-tab]").forEach(sec => sec.hidden = sec.dataset.tab !== name || blocked);
+    $("stopped-note").hidden = !blocked;
+    $("stopped-note").innerHTML = status.rootReady === false
+      ? tr("Спершу завершіть налаштування служби FSDrive в розділі <b>«Загальні»</b>.", "Finish setting up the FSDrive service in <b>General</b> first.")
+      : status.enabled ? tr("Служба FSDrive запускається або не змогла запуститися (журнал: <code>/var/packages/FSDrive/var/fsdrived.log</code>).",
+                            "The FSDrive service is starting or failed to start (log: <code>/var/packages/FSDrive/var/fsdrived.log</code>).")
+      : tr("Службу FSDrive зупинено. Увімкніть її в розділі <b>«Загальні»</b>.", "The FSDrive service is stopped. Enable it in <b>General</b>.");
+    if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+  }
+  document.querySelectorAll("nav.side button").forEach(t => t.onclick = () => showTab(t.dataset.tab));
+  window.onhashchange = () => showTab(location.hash.slice(1));
+  showTab(location.hash.slice(1));
+
+  function loadAll() {
+    if (status.port) { for (const el of document.querySelectorAll(".local-port")) el.textContent = status.port; $("directPort").placeholder = status.port; }
+    loadBlocked();
+    return Promise.all([call("shares"), call("settings"), call("users")]).then(([shares, settingsNow, list]) => {
+      const paths = shares.shares.map(sh => sh.path);
+      if (settingsNow.folderPath && !paths.includes(settingsNow.folderPath)) shares.shares.unshift({ name: settingsNow.folderPath, path: settingsNow.folderPath });
+      $("share").innerHTML = shares.shares.map(sh => `<option value="${esc(sh.path)}">${esc(sh.name)}</option>`).join("");
+      settings = settingsNow;
+      savedSettings = { ...settingsNow };
+      renderSettings();
+      renderAccess();
+      renderUsers(list.users);
+      loaded = true;
+    });
+  }
+
+  // While setup is pending or the service is starting, the page checks again by itself.
+  function refreshStatus() {
+    return call("status").then(s => {
+      const wasRunning = status.running;
+      status = s;
+      renderGeneral();
+      showTab(location.hash.slice(1));
+      if (s.running && (!loaded || !wasRunning)) return loadAll();
+    });
+  }
+  refreshStatus().catch(err => {
+    $("users").innerHTML = `<tr><td colspan="8" class="bad">${esc(err.message)}</td></tr>`;
+    $("state").textContent = "";
+    fail("saved-general", err);
+  });
+  setInterval(() => { if (status.enabled && !status.running) refreshStatus().catch(() => {}); }, 4000);
+</script>
+</body>
+</html>

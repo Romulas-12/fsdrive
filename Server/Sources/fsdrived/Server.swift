@@ -217,7 +217,7 @@ func buildRouter(store: Store, transfers: Transfers, scanner: Scanner, config: S
                             message: "Забагато невдалих спроб входу. Спробуйте через \(minutes) хв.")
         }
         await loginGuard.checks.acquire()
-        let verdict = QTSAuth.verify(user: req.user, password: req.password)
+        let verdict = NAS.current.verify(user: req.user, password: req.password)
         await loginGuard.checks.release()
         switch verdict {
         case .ok:
@@ -227,12 +227,13 @@ func buildRouter(store: Store, transfers: Transfers, scanner: Scanner, config: S
             for blocked in await loginGuard.failed(ip: ip, user: req.user) {
                 let what = blocked.hasPrefix("ip:") ? "адресу \(blocked.dropFirst(3))" : "вхід для \(blocked.dropFirst(5))"
                 logLine("login blocked: \(blocked) for 15 min")
-                qtsLogWarning("[FSDrive] Забагато невдалих спроб входу: заблоковано \(what) на 15 хв")
+                nasLogWarning("[FSDrive] Забагато невдалих спроб входу: заблоковано \(what) на 15 хв")
             }
             try await Task.sleep(nanoseconds: 1_000_000_000)  // slows down password guessing
             throw HTTPError(.unauthorized, message: "Неправильне ім'я користувача або пароль")
-        case .twoStep: throw HTTPError(.forbidden, message: "Двоетапна перевірка QTS поки не підтримується")
-        case .unavailable: throw HTTPError(.notImplemented, message: "Вхід за паролем QTS працює лише на QNAP")
+        case .twoStep: throw HTTPError(.forbidden, message: "Двоетапна перевірка \(NAS.current.system) поки не підтримується")
+        case .refused(let why): throw HTTPError(.forbidden, message: why)
+        case .unavailable: throw HTTPError(.notImplemented, message: "Вхід за паролем працює лише на NAS (QNAP або Synology)")
         }
         guard try await store.isAllowed(req.user) else {
             throw HTTPError(.forbidden, message: "Адміністратор ще не дозволив \(req.user) користуватися FSDrive")
@@ -349,7 +350,7 @@ func buildRouter(store: Store, transfers: Transfers, scanner: Scanner, config: S
         return try await transfers.commit(uploadId: try context.parameters.require("id"))
     }
 
-    // MARK: Admin (QTS settings page)
+    // MARK: Admin (the NAS settings page)
 
     router.get("/v1/admin/settings") { _, context in
         try context.requireAdmin()

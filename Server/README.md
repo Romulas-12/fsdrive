@@ -3,7 +3,7 @@
 Сервер синхронізації `fsdrived`, спільний для всіх клієнтів, і те, що потрібно клієнтам від нього:
 бібліотеки `FSDriveCore` (протокол, типи API, хешування, закріплення ключа сервера) і
 `FSDriveClientKit` (мережевий клієнт), а також CLI-клієнт `fsdrive`. Пакування під конкретні NAS — у
-`Packaging/<система>` (зараз `qnap`; `synology` та інші додаються поруч). Архітектура: [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md).
+`Packaging/<система>` (`qnap`, `synology`; інші додаються поруч). Архітектура: [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md).
 
 Усі команди нижче виконуються з цієї теки (`Server/`).
 
@@ -51,6 +51,44 @@ scripts/build-qpkg.sh          # -> build/qpkg/FSDrive_<версія>_arm_64.qpk
 Сервіс слухає порт 8740, працює з пониженим пріоритетом (`nice`), лог — у `fsdrived.log` в теці застосунку.
 Інша тека для даних: `setcfg FSDrive DataRoot /share/<тека> -f /etc/config/qpkg.conf`, потім перезапуск.
 
+## Сервер на Synology (SPK)
+
+```bash
+scripts/build-spk.sh           # -> build/spk/FSDrive_<версія>_x86_64.spk  (--arm додає armv8 для ARM64-моделей)
+```
+
+Той самий Linux-бінарник (`scripts/build-linux.sh`), запакований у звичайний tar-архів SPK; набір інструментів
+Synology не потрібен. Потрібен DSM 7.
+
+Встановлення:
+
+1. Package Center → «Встановити вручну» → `FSDrive_<версія>_x86_64.spk`. Пакет не підписаний Synology, тож DSM
+   попередить про невідомого видавця.
+2. Одноразове налаштування від root. DSM 7 запускає сторонні пакети від окремого користувача без прав root, а
+   `fsdrived` має записувати файли від імені кожного користувача й перевіряти паролі в DSM. Тому пакет лише
+   вмикає й вимикає службу, а запускає `fsdrived` невелика служба systemd (`bin/fsdrive-supervise`), яку
+   ставить `bin/fsdrive-root.sh`. Сторінка FSDrive у DSM показує обидва способи:
+   - **Планувальник завдань** (зберігається після оновлень DSM): Control Panel → Task Scheduler → Create →
+     Triggered Task → User-defined script, користувач `root`, подія Boot-up, команда
+     `/var/packages/FSDrive/target/bin/fsdrive-root.sh`; потім «Run»;
+   - або один раз через SSH: `sudo /var/packages/FSDrive/target/bin/fsdrive-root.sh`.
+3. Далі все як на QNAP: у FSDrive (головне меню DSM) виберіть, де зберігати файли (домашні теки — потрібна
+   служба домашніх тек у Control Panel → User & Group → Advanced — або спільна тека) і кому дати доступ.
+
+Що інакше, ніж на QNAP:
+
+- Пароль перевіряє DSM через свій API входу на цьому NAS (`SYNO.API.Auth`, пароль передається curl через
+  stdin), тож діють правила DSM: вимкнені облікові записи, застарілі паролі, привілеї застосунків. Із
+  двоетапною перевіркою DSM вхід поки не працює.
+- Користувачі — локальні облікові записи DSM з UID від 1024 (без `guest` і службових користувачів пакетів).
+- Файли належать користувачу з групою `administrators` (gid 101).
+- Дані сервера — у `/var/packages/FSDrive/var/data`, лог — `/var/packages/FSDrive/var/fsdrived.log`, порт
+  8740 (інший: число у `/var/packages/FSDrive/var/port`). Брандмауер DSM знає службу як «FSDrive».
+- Сторінка налаштувань працює від користувача пакета й відповідає лише адміністраторам DSM (сесія й
+  SynoToken перевіряє `authenticate.cgi`). Токен сервера для неї кладе root-служба у `var/cgi`.
+- Після видалення пакета root-служба за хвилину вимикає й видаляє себе сама. Завдання в Планувальнику
+  треба видалити вручну.
+
 ## Репозиторій пакетів
 
 Замість ручного встановлення NAS може брати FSDrive й оновлення з репозиторію пакетів. Для кожної системи
@@ -60,7 +98,7 @@ NAS це окремий GitHub-репозиторій `Romulas-12/fsdrive-packag
 | Система | Репозиторій | Адреса для магазину застосунків |
 |---|---|---|
 | QNAP | [fsdrive-packages-qnap](https://github.com/Romulas-12/fsdrive-packages-qnap) | `https://romulas-12.github.io/fsdrive-packages-qnap/repo.xml` |
-| Synology | згодом `fsdrive-packages-synology` | — |
+| Synology | [fsdrive-packages-synology](https://github.com/Romulas-12/fsdrive-packages-synology) | `https://romulas-12.github.io/fsdrive-packages-synology/x86_64.json` (Intel/AMD), `…/armv8.json` (ARM) |
 
 ```bash
 scripts/build-qpkg.sh --x86
@@ -71,6 +109,11 @@ scripts/publish-repo.sh qnap     # збирає сайт у build/repo/qnap і �
 іншого хостингу: `scripts/build-repo.py qnap --base-url https://<хост>/<шлях>`. Спільний опис застосунку
 лежить у `Packaging/repo/app.json`. Нова система — це функція `build_<система>` і запис у `SYSTEMS`
 у `scripts/build-repo.py`, тека `Packaging/<система>` і новий репозиторій `fsdrive-packages-<система>`.
+
+Synology: `scripts/build-spk.sh --arm`, потім `scripts/publish-repo.sh synology`. DSM 7 питає джерело пакетів
+звичайним GET (модель, архітектура й збірка DSM — у параметрах адреси), тож статичного сайту досить; але
+відповісти по-різному для різних процесорів він не може, тому для кожної архітектури своя адреса
+(`x86_64.json`, `armv8.json`). У Package Center → Settings → General → Trust Level треба вибрати «Any publisher».
 
 На QNAP: App Center → Налаштування → «Репозиторій застосунків» → «Додати», адреса з таблиці. Пакет не
 підписаний, тож дозвіл на застосунки без цифрового підпису потрібен і тут.

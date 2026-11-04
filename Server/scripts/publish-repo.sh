@@ -2,8 +2,8 @@
 # Publishes the package site of one NAS system to GitHub Pages:
 #   https://github.com/Romulas-12/fsdrive-packages-<system> -> https://romulas-12.github.io/fsdrive-packages-<system>/
 #
-# usage: scripts/publish-repo.sh qnap
-#   run scripts/build-qpkg.sh [--x86] first.
+# usage: scripts/publish-repo.sh qnap|synology
+#   run scripts/build-qpkg.sh [--x86] or scripts/build-spk.sh [--arm] first.
 #
 # Every publish replaces the history with one commit: the site holds only the latest packages,
 # and old packages do not pile up in git.
@@ -26,4 +26,9 @@ git commit -q -m "Publish $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 git push -q -f "https://github.com/$REPO.git" main
 echo "published: $BASE_URL/ — checking the live site"
 cd - >/dev/null
-scripts/check-repo.py "$BASE_URL" --wait-for "$(sed -n 's:.*<cachechk>\(.*\)</cachechk>.*:\1:p' "$SITE/repo.xml")"
+if [ -f "$SITE/repo.xml" ]; then
+    STAMP=$(sed -n 's:.*<cachechk>\(.*\)</cachechk>.*:\1:p' "$SITE/repo.xml")
+else
+    STAMP=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["published"])' "$SITE/release.json")
+fi
+scripts/check-repo.py "$BASE_URL" --wait-for "$STAMP"

@@ -609,10 +609,10 @@ actor Store {
     }
 
     /// Files written for a user belong to that user, with the administrators group
-    /// (gid 0 on QNAP) able to manage them; other users get nothing.
+    /// (gid 0 on QNAP, 101 on DSM) able to manage them; other users get nothing.
     nonisolated func own(_ lib: Library, fd: Int32, dir: Bool) {
         guard let uid = lib.ownerUid else { return }
-        FileIO.setOwner(fd: fd, uid: uid, gid: 0, mode: dir ? 0o770 : 0o660)
+        FileIO.setOwner(fd: fd, uid: uid, gid: NAS.current.adminGid, mode: dir ? 0o770 : 0o660)
     }
 
     /// For folders the server has just created.

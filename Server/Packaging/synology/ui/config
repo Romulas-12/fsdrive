@@ -1,0 +1,14 @@
+{
+  ".url": {
+    "SYNO.SDS.FSDrive": {
+      "type": "legacy",
+      "allUsers": false,
+      "title": "FSDrive",
+      "desc": "File sync",
+      "icon": "images/fsdrive_{0}.png",
+      "url": "/webman/3rdparty/FSDrive/index.html",
+      "grantPrivilege": "local",
+      "advanceGrantPrivilege": true
+    }
+  }
+}

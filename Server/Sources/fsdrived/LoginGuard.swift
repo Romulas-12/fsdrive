@@ -24,7 +24,7 @@ actor LoginGuard {
     private var blocked: [String: Date] = [:]
     private var lastPrune = Date()
 
-    /// Password checks run at once at most: each starts a QTS process, and a flood of
+    /// Password checks run at once at most: each starts a QTS or DSM process, and a flood of
     /// parallel guesses would otherwise all be checked before any block applies.
     nonisolated let checks = Limiter(4)
 
@@ -110,8 +110,9 @@ func clientAddress(_ request: Request, peer: String?, trusted: [String]) -> Stri
 }
 
 /// Writes a warning to the QTS system log (QuLog), so blocks show up where QTS
-/// administrators already look. A no-op off QNAP.
-func qtsLogWarning(_ message: String) {
+/// administrators already look. A no-op elsewhere: on DSM they are in fsdrived.log and
+/// on the settings page.
+func nasLogWarning(_ message: String) {
     let tool = "/sbin/log_tool"
     guard FileManager.default.isExecutableFile(atPath: tool) else { return }
     let p = Process()

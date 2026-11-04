@@ -20,7 +20,7 @@
 | Що | Де взяти |
 |---|---|
 | Сервер на QNAP | App Center → Налаштування → «Репозиторій застосунків» → «Додати»: `https://romulas-12.github.io/fsdrive-packages-qnap/repo.xml` ([сторінка пакета](https://github.com/Romulas-12/fsdrive-packages-qnap)) |
-| Сервер на Synology | Згодом: `fsdrive-packages-synology` |
+| Сервер на Synology | Package Center → Settings → Package Sources → «Add»: `https://romulas-12.github.io/fsdrive-packages-synology/x86_64.json` (Intel/AMD) або `…/armv8.json` (ARM) ([сторінка пакета](https://github.com/Romulas-12/fsdrive-packages-synology), [налаштування](Server/README.md#сервер-на-synology-spk)) |
 | Клієнт для macOS | Збірка з `Clients/macOS` ([як зібрати](Clients/macOS/README.md)) |
 | Клієнт для Windows | Згодом (x86_64 і ARM64) |
 
